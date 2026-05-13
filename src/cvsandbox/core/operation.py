@@ -63,6 +63,13 @@ class OperationSpec:
     parameters: tuple[Parameter, ...]
     func: OperationFunc
     code_export: CodeExporter | None = None
+    input_ports: tuple[str, ...] = ("in",)
+    """Names of the inputs the op accepts, in the positional order `func`
+    expects. Default = a single image input named "in" (all 24 built-in
+    operations). Multi-input ops (blend, mask, ...) override this."""
+    output_ports: tuple[str, ...] = ("out",)
+    """Names of the outputs the op produces. Default = a single image named
+    "out". Multi-output ops (channel split, ...) override this."""
 
     def __post_init__(self) -> None:
         if not self.id or "." not in self.id:

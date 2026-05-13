@@ -52,8 +52,13 @@ SCENE_MARGIN = 24
 CHIP_RADIUS = 7
 CHIP_INSET = 8
 
+PORT_RADIUS = 6
+PORT_GAP = 14  # vertical gap between adjacent ports on the same edge
+
 EDGE_COLOR = QColor("#5b6470")
 EDGE_WIDTH = 2
+PORT_FILL = QColor("#1d2129")
+PORT_BORDER = QColor("#cfd6df")
 
 DISABLED_ALPHA = 110
 
