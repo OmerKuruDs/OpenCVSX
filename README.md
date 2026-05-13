@@ -10,7 +10,7 @@
 [![PySide6](https://img.shields.io/badge/PySide6-6.6%2B-41CD52)](https://doc.qt.io/qtforpython/)
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.9%2B-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-129%20passing-success)](tests/)
+[![Tests](https://img.shields.io/badge/tests-180%20passing-success)](tests/)
 
 </div>
 
@@ -33,6 +33,9 @@ Built for engineers who currently iterate on `cv2.GaussianBlur(img, (5, 5), 0)` 
 - **Histogram panel** — per-channel intensity overlay refreshes with every preview.
 - **Zoom & pan** — cursor-anchored mouse-wheel zoom, drag-to-pan, double-click to refit.
 - **Per-operation timing** — each pipeline row shows how long that step took on the last preview run.
+- **Fast preview on huge images** — sources larger than 1600 px on their longest side are auto-downscaled for the live preview loop only; code export stays full-resolution.
+- **Region of interest (ROI)** — draw a rectangle on the image (`Ctrl+R`) and the pipeline runs only inside that region; drag inside the rectangle to drop the processed crop somewhere else on the canvas. Exported code reproduces the same crop / paste-back behavior.
+- **Node-graph pipeline view** — the bottom strip renders the pipeline as a horizontal chain of nodes with bezier connectors. Drag a node sideways to reorder; click the green chip to enable/disable; click the X chip to remove.
 
 ## Quick start
 
@@ -43,7 +46,7 @@ python -m venv .venv
 .venv\Scripts\activate              # Windows PowerShell
 # source .venv/bin/activate         # Linux / macOS
 pip install -e ".[dev]"
-pytest                              # 129 tests, all passing
+pytest                              # 180 tests, all passing
 cvsandbox                           # launch the GUI
 ```
 
@@ -68,12 +71,13 @@ src/cvsandbox/
 └── ui/                    # PySide6 widgets
     ├── app.py             # QApplication bootstrap
     ├── main_window.py     # Window assembly + menus + worker wiring
-    ├── image_view.py      # Zoom / pan + before / after split
+    ├── image_view.py      # Zoom / pan + before / after split + ROI overlays
+    ├── image_tools_panel.py  # Sidebar of toggles next to the image view
     ├── histogram_panel.py
     ├── operation_catalog.py
     ├── parameter_panel.py
     ├── parameter_widgets.py
-    ├── pipeline_view.py
+    ├── node_graph_view.py # Visual node-chain replacement for the old list view
     ├── pipeline_worker.py # Background thread for preview
     └── code_export_dialog.py
 ```
@@ -112,7 +116,7 @@ The catalog, parameter panel, and code exporter all pick up the new spec automat
 - [x] Debounced preview with a worker thread
 - [x] Zoom and pan in the image view
 - [x] 24 built-in operations
-- [ ] Downscaling preview mode for very large images
+- [x] Downscaling preview mode for very large images
 
 **v0.3 — Power user**
 - [x] Pipeline save / load (`.cvpipe.json`)
@@ -120,9 +124,14 @@ The catalog, parameter panel, and code exporter all pick up the new spec automat
 - [x] Histogram panel
 - [x] Before / after split view
 - [x] Per-operation timing HUD
-- [ ] Drag-and-drop pipeline reordering
+- [x] Drag-and-drop pipeline reordering
 
-**v1.0 and beyond.** Node-based graph UI, ROI selection, video / camera input, batch processing.
+**v1.0 and beyond**
+- [x] ROI selection — pipeline operates only inside a user-drawn rectangle
+- [x] Node-graph pipeline view (visual layer; underlying model still linear)
+- [ ] True DAG semantics — multi-input ops, branching, merging
+- [ ] Video / camera input
+- [ ] Batch processing
 
 ## License
 

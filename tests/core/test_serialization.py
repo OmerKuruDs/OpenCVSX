@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from cvsandbox.core.operation import OperationSpec, Parameter
-from cvsandbox.core.pipeline import Pipeline
+from cvsandbox.core.pipeline import Pipeline, Roi
 from cvsandbox.core.registry import clear_registry, register_operation
 from cvsandbox.core.serialization import from_dict, load, save, to_dict
 
@@ -76,6 +76,26 @@ def test_from_dict_is_atomic_on_unknown_operation() -> None:
         from_dict(bad_data, pipe)
     assert len(pipe) == 1
     assert pipe.nodes[0].params == {"value": 1}
+
+
+def test_roi_round_trips_through_to_dict_and_from_dict() -> None:
+    original = Pipeline()
+    original.add(ADD, {"value": 5})
+    original.roi = Roi(x=10, y=20, width=30, height=40)
+
+    payload = to_dict(original)
+    assert payload["roi"] == {"x": 10, "y": 20, "width": 30, "height": 40}
+
+    restored = Pipeline()
+    from_dict(payload, restored)
+    assert restored.roi == Roi(x=10, y=20, width=30, height=40)
+
+
+def test_missing_roi_key_loads_as_none() -> None:
+    restored = Pipeline()
+    restored.roi = Roi(x=1, y=2, width=3, height=4)  # pre-existing — should be cleared
+    from_dict({"version": 1, "nodes": []}, restored)
+    assert restored.roi is None
 
 
 def test_save_then_load_via_file(tmp_path: Path) -> None:

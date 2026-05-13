@@ -24,20 +24,30 @@ import json
 from pathlib import Path
 from typing import Any
 
-from cvsandbox.core.pipeline import Pipeline, PipelineNode
+from cvsandbox.core.pipeline import Pipeline, PipelineNode, Roi
 from cvsandbox.core.registry import get_operation
 
 CURRENT_VERSION = 1
 
 
 def to_dict(pipeline: Pipeline) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "version": CURRENT_VERSION,
         "nodes": [
             {"id": node.spec.id, "params": dict(node.params), "enabled": node.enabled}
             for node in pipeline.nodes
         ],
     }
+    if pipeline.roi is not None:
+        payload["roi"] = {
+            "x": pipeline.roi.x,
+            "y": pipeline.roi.y,
+            "width": pipeline.roi.width,
+            "height": pipeline.roi.height,
+        }
+    if pipeline.roi_paste_to is not None:
+        payload["roi_paste_to"] = list(pipeline.roi_paste_to)
+    return payload
 
 
 def from_dict(data: dict[str, Any], into: Pipeline) -> None:
@@ -50,7 +60,22 @@ def from_dict(data: dict[str, Any], into: Pipeline) -> None:
         node = PipelineNode(spec=spec, params=dict(raw.get("params", {})))
         node.enabled = bool(raw.get("enabled", True))
         new_nodes.append(node)
+    new_roi: Roi | None = None
+    if "roi" in data and data["roi"] is not None:
+        raw_roi = data["roi"]
+        new_roi = Roi(
+            x=int(raw_roi["x"]),
+            y=int(raw_roi["y"]),
+            width=int(raw_roi["width"]),
+            height=int(raw_roi["height"]),
+        )
+    new_paste: tuple[int, int] | None = None
+    if data.get("roi_paste_to") is not None:
+        raw_paste = data["roi_paste_to"]
+        new_paste = (int(raw_paste[0]), int(raw_paste[1]))
     into.nodes[:] = new_nodes  # atomic swap once we know everything materialized
+    into.roi = new_roi
+    into.roi_paste_to = new_paste
 
 
 def save(pipeline: Pipeline, path: Path) -> None:

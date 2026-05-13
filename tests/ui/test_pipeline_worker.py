@@ -108,6 +108,62 @@ def test_empty_pipeline_returns_a_copy(qapp: QApplication) -> None:
         _stop(thread)
 
 
+def test_worker_applies_roi_crop_and_splice(qapp: QApplication) -> None:
+    worker, thread = _make_worker_on_thread()
+    try:
+        received: list[np.ndarray] = []
+        worker.result_ready.connect(lambda _rid, img, _t: received.append(img))
+
+        image = np.full((10, 10), 100, dtype=np.uint8)
+        request = PipelineRequest(
+            request_id=1,
+            image=image,
+            steps=((_add, {"value": 50}),),
+            roi=(2, 2, 4, 4),
+        )
+        worker.execute(request)
+        _wait_for(lambda: bool(received))
+
+        out = received[0]
+        # Inside the ROI: 100 + 50 = 150
+        assert int(out[2, 2]) == 150
+        assert int(out[5, 5]) == 150
+        # Outside the ROI: unchanged source value
+        assert int(out[0, 0]) == 100
+        assert int(out[9, 9]) == 100
+    finally:
+        _stop(thread)
+
+
+def test_worker_with_roi_returns_source_on_shape_change(qapp: QApplication) -> None:
+    """If the steps change the crop's shape (e.g. a resize), splice fails and
+    the worker hands back the unmodified source rather than a corrupt result."""
+    worker, thread = _make_worker_on_thread()
+    try:
+        received: list[np.ndarray] = []
+        worker.result_ready.connect(lambda _rid, img, _t: received.append(img))
+
+        def _halve(image: np.ndarray) -> np.ndarray:
+            h, w = image.shape[:2]
+            return image[: h // 2, : w // 2]
+
+        image = np.full((10, 10), 100, dtype=np.uint8)
+        request = PipelineRequest(
+            request_id=2,
+            image=image,
+            steps=((_halve, {}),),
+            roi=(2, 2, 4, 4),
+        )
+        worker.execute(request)
+        _wait_for(lambda: bool(received))
+
+        out = received[0]
+        assert out.shape == image.shape
+        assert np.array_equal(out, image)
+    finally:
+        _stop(thread)
+
+
 def test_worker_per_step_timings_match_step_count(qapp: QApplication) -> None:
     worker, thread = _make_worker_on_thread()
     try:
