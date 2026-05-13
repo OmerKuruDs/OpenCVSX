@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from PySide6.QtCore import QPointF
+from PySide6.QtCore import QPointF, Qt
 from PySide6.QtWidgets import QApplication
 
 from cvsandbox.core.operation import OperationSpec, Parameter
@@ -11,6 +11,7 @@ from cvsandbox.ui.node_graph_view import (
     NODE_WIDTH,
     SCENE_MARGIN,
     NodeGraphView,
+    NodeItem,
     _layout_x,
     format_duration,
 )
@@ -308,6 +309,40 @@ def test_drag_to_disconnect_drops_edge_when_released_in_empty_space(
     assert pipeline.graph.edges == []
     # Each step that mutates the graph emits pipeline_changed.
     assert fired
+
+
+def test_clicking_input_port_via_real_mouse_event_fires_signal(
+    qapp: QApplication,
+) -> None:
+    """Regression: NodeItem.boundingRect must cover the port circles, or Qt
+    silently drops mouse presses landing on them. Without this, drag-to-connect
+    is dead because the underlying signal never fires."""
+    from PySide6.QtCore import QEvent
+    from PySide6.QtWidgets import QGraphicsSceneMouseEvent
+
+    pipeline = Pipeline()
+    pipeline.add(_spec("test.a", "Alpha"))
+    pipeline.add(_multi_input_spec())
+    widget = NodeGraphView(pipeline)
+    widget.show()
+    qapp.processEvents()
+
+    blend_item = widget._nodes[1]
+    port_scene = blend_item.input_port_scene_position("b")
+    # Hit-test the scene position to confirm Qt now reaches the node item.
+    found = widget._scene.itemAt(port_scene, widget.transform())
+    assert isinstance(found, NodeItem)
+    assert found is blend_item
+
+    received: list[tuple[int, str]] = []
+    blend_item.input_port_pressed.connect(lambda i, n: received.append((i, n)))
+    local = blend_item.mapFromScene(port_scene)
+    event = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMousePress)
+    event.setPos(local)
+    event.setButton(Qt.MouseButton.LeftButton)
+    blend_item.mousePressEvent(event)
+    qapp.processEvents()
+    assert received == [(1, "b")]
 
 
 def test_drag_to_connect_rejects_cycle(qapp: QApplication) -> None:

@@ -56,6 +56,8 @@ CHIP_INSET = 8
 
 PORT_RADIUS = 6
 PORT_GAP = 14  # vertical gap between adjacent ports on the same edge
+PORT_HIT_PAD = 3  # extra forgiveness around each port for mouse hit-testing
+PORT_BOUND_PAD = 2 * PORT_RADIUS + PORT_HIT_PAD + 2  # space the boundingRect needs to grant on either side
 
 EDGE_COLOR = QColor("#5b6470")
 EDGE_WIDTH = 2
@@ -133,7 +135,16 @@ class NodeItem(QGraphicsObject):
     # ------------------------------------------------------------------ painting
 
     def boundingRect(self) -> QRectF:  # noqa: N802 (Qt override)
-        return QRectF(0, 0, NODE_WIDTH, NODE_HEIGHT)
+        # Extend the rect so the port circles on either edge sit inside it;
+        # Qt only routes mouse events to items whose boundingRect contains the
+        # cursor, so ports drawn outside this region would otherwise be unhit-
+        # testable.
+        return QRectF(
+            -PORT_BOUND_PAD,
+            0,
+            NODE_WIDTH + 2 * PORT_BOUND_PAD,
+            NODE_HEIGHT,
+        )
 
     def paint(
         self,
@@ -142,7 +153,10 @@ class NodeItem(QGraphicsObject):
         widget: QWidget | None = None,
     ) -> None:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        rect = self.boundingRect().adjusted(0.5, 0.5, -0.5, -0.5)
+        # The body fills the node's NODE_WIDTH by NODE_HEIGHT box; the
+        # boundingRect is wider to absorb port hit-tests but visual painting
+        # of the rounded body should stay on the original geometry.
+        rect = QRectF(0.5, 0.5, NODE_WIDTH - 1, NODE_HEIGHT - 1)
 
         body_color = QColor(self._color)
         if not self.enabled:
@@ -277,7 +291,7 @@ class NodeItem(QGraphicsObject):
     def _hit_port(point: QPointF, center: QPointF) -> bool:
         dx = point.x() - center.x()
         dy = point.y() - center.y()
-        return dx * dx + dy * dy <= (PORT_RADIUS + 3) ** 2
+        return dx * dx + dy * dy <= (PORT_RADIUS + PORT_HIT_PAD) ** 2
 
     # ------------------------------------------------------------------ events
 
