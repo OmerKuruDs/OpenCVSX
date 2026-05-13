@@ -53,20 +53,23 @@ def _find_contours(
     return canvas
 
 
-def _find_contours_code(params: dict[str, Any]) -> list[str]:
+def _find_contours_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     mode = _RETR_CONSTS[params["mode"]]
     min_area = int(params["min_area"])
     thickness = int(params["thickness"])
     return [
-        "_gray = img if img.ndim == 2 else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)",
+        f"_gray = {a} if {a}.ndim == 2 else cv2.cvtColor({a}, cv2.COLOR_BGR2GRAY)",
         "_, _mask = cv2.threshold(_gray, 0, 255, cv2.THRESH_BINARY)",
         f"_contours, _ = cv2.findContours(_mask, {mode}, cv2.CHAIN_APPROX_SIMPLE)",
         f"_contours = tuple(c for c in _contours if cv2.contourArea(c) >= {float(min_area)})"
         if min_area > 0
         else "# (no min-area filter)",
-        "_canvas = img if img.ndim == 3 else cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)",
-        "img = _canvas.copy()",
-        f"cv2.drawContours(img, _contours, -1, (0, 255, 0), {thickness})",
+        f"_canvas = {a} if {a}.ndim == 3 else cv2.cvtColor({a}, cv2.COLOR_GRAY2BGR)",
+        f"{output_var} = _canvas.copy()",
+        f"cv2.drawContours({output_var}, _contours, -1, (0, 255, 0), {thickness})",
     ]
 
 

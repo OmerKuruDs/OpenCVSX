@@ -14,7 +14,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from cvsandbox.operations import load_builtin_operations
-from cvsandbox.resources import ICON_PATH
+from cvsandbox.resources import ARROW_DOWN_PATH, ARROW_UP_PATH, ICON_PATH, THEME_QSS_PATH
 from cvsandbox.ui.main_window import MainWindow
 
 
@@ -24,6 +24,14 @@ def run(argv: Sequence[str] | None = None) -> int:
     app = QApplication(list(argv) if argv is not None else sys.argv)
     app.setApplicationName("cvsandbox")
     app.setWindowIcon(QIcon(str(ICON_PATH)))
+    if THEME_QSS_PATH.exists():
+        qss = THEME_QSS_PATH.read_text(encoding="utf-8")
+        # QSS `url(...)` resolves against the CWD without help — substitute
+        # bundled-resource placeholders with absolute forward-slash paths so
+        # spinbox arrows etc. render regardless of where the app is launched.
+        qss = qss.replace("__ARROW_UP__", ARROW_UP_PATH.as_posix())
+        qss = qss.replace("__ARROW_DOWN__", ARROW_DOWN_PATH.as_posix())
+        app.setStyleSheet(qss)
     window = MainWindow()
     window.show()
     return app.exec()

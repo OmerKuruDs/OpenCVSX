@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
     QHBoxLayout,
+    QLabel,
     QSpinBox,
     QWidget,
 )
@@ -61,6 +62,7 @@ class IntControl(ParameterControl):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._spin)
+        layout.addWidget(_range_label(int(param.min), int(param.max), self))
 
     def value(self) -> int:
         return int(self._spin.value())
@@ -79,12 +81,16 @@ class FloatControl(ParameterControl):
         self._spin.setRange(float(param.min), float(param.max))
         step = float(param.step) if param.step is not None else 0.1
         self._spin.setSingleStep(step)
-        self._spin.setDecimals(_decimals_for_step(step))
+        decimals = _decimals_for_step(step)
+        self._spin.setDecimals(decimals)
         self._spin.setValue(float(param.default))
         self._spin.valueChanged.connect(lambda _: self.value_changed.emit())
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._spin)
+        layout.addWidget(
+            _range_label(float(param.min), float(param.max), self, decimals=decimals)
+        )
 
     def value(self) -> float:
         return float(self._spin.value())
@@ -155,6 +161,7 @@ class KernelSizeControl(ParameterControl):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._spin)
+        layout.addWidget(_range_label(int(param.min), int(param.max), self, suffix=" (odd)"))
 
     def _on_spin_changed(self, raw: int) -> None:
         snapped = _snap_odd(int(raw))
@@ -193,6 +200,26 @@ def create_control(param: Parameter, parent: QWidget | None = None) -> Parameter
 
 def _snap_odd(value: int) -> int:
     return value | 1
+
+
+def _range_label(
+    minimum: float,
+    maximum: float,
+    parent: QWidget,
+    *,
+    decimals: int = 0,
+    suffix: str = "",
+) -> QLabel:
+    """Small muted label that shows a parameter's permitted range next to its
+    spinbox so the user knows what to type without trial and error."""
+    if decimals:
+        text = f"{minimum:.{decimals}f} … {maximum:.{decimals}f}"
+    else:
+        text = f"{int(minimum)} … {int(maximum)}"
+    label = QLabel(f"{text}{suffix}", parent)
+    label.setStyleSheet("color: #64748b; font-size: 8pt;")
+    label.setToolTip(f"Allowed range: {text}{suffix}")
+    return label
 
 
 def _decimals_for_step(step: float) -> int:

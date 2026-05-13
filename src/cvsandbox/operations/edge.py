@@ -15,7 +15,12 @@ import numpy as np
 
 from cvsandbox.core.operation import OperationSpec, Parameter
 
-_TO_GRAY_LINE = "img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img"
+
+def _to_gray_line(in_var: str, out_var: str) -> str:
+    return (
+        f"{out_var} = cv2.cvtColor({in_var}, cv2.COLOR_BGR2GRAY) "
+        f"if {in_var}.ndim == 3 else {in_var}"
+    )
 
 
 def _to_gray(image: np.ndarray) -> np.ndarray:
@@ -24,33 +29,43 @@ def _to_gray(image: np.ndarray) -> np.ndarray:
     return image
 
 
-def _canny_code(params: dict[str, Any]) -> list[str]:
+def _canny_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     aperture = max(3, min(7, int(params["aperture_size"]) | 1))
     return [
-        _TO_GRAY_LINE,
-        f"img = cv2.Canny(img, {float(params['threshold1'])}, "
+        _to_gray_line(a, output_var),
+        f"{output_var} = cv2.Canny({output_var}, {float(params['threshold1'])}, "
         f"{float(params['threshold2'])}, apertureSize={aperture})",
     ]
 
 
-def _sobel_code(params: dict[str, Any]) -> list[str]:
+def _sobel_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     dx = int(params["dx"])
     dy = int(params["dy"])
     if dx == 0 and dy == 0:
-        # Match the runtime fallback: just grayscale.
-        return [_TO_GRAY_LINE]
+        return [_to_gray_line(a, output_var)]
     k = max(1, min(7, int(params["ksize"]) | 1))
     return [
-        _TO_GRAY_LINE,
-        f"img = cv2.convertScaleAbs(cv2.Sobel(img, cv2.CV_64F, {dx}, {dy}, ksize={k}))",
+        _to_gray_line(a, output_var),
+        f"{output_var} = cv2.convertScaleAbs(cv2.Sobel({output_var}, cv2.CV_64F, "
+        f"{dx}, {dy}, ksize={k}))",
     ]
 
 
-def _laplacian_code(params: dict[str, Any]) -> list[str]:
+def _laplacian_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     k = max(1, min(31, int(params["ksize"]) | 1))
     return [
-        _TO_GRAY_LINE,
-        f"img = cv2.convertScaleAbs(cv2.Laplacian(img, cv2.CV_64F, ksize={k}))",
+        _to_gray_line(a, output_var),
+        f"{output_var} = cv2.convertScaleAbs(cv2.Laplacian({output_var}, "
+        f"cv2.CV_64F, ksize={k}))",
     ]
 
 

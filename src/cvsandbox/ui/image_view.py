@@ -87,7 +87,9 @@ class ImageViewWidget(QGraphicsView):
         self._paste_item: QGraphicsRectItem | None = None
 
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setBackgroundBrush(Qt.GlobalColor.darkGray)
+        # Cool slate-blue keeps contrast with both dark and bright images while
+        # matching the icon's navy ramp.
+        self.setBackgroundBrush(QColor("#1a2654"))
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)

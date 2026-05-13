@@ -15,19 +15,25 @@ def _gaussian_blur(image: np.ndarray, ksize: int, sigma_x: float) -> np.ndarray:
     return cv2.GaussianBlur(image, (k, k), float(sigma_x))
 
 
-def _gaussian_blur_code(params: dict[str, Any]) -> list[str]:
+def _gaussian_blur_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     k = int(params["ksize"]) | 1
     sigma = float(params["sigma_x"])
-    return [f"img = cv2.GaussianBlur(img, ({k}, {k}), {sigma})"]
+    return [f"{output_var} = cv2.GaussianBlur({a}, ({k}, {k}), {sigma})"]
 
 
 def _median_blur(image: np.ndarray, ksize: int) -> np.ndarray:
     return cv2.medianBlur(image, int(ksize) | 1)
 
 
-def _median_blur_code(params: dict[str, Any]) -> list[str]:
+def _median_blur_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     k = int(params["ksize"]) | 1
-    return [f"img = cv2.medianBlur(img, {k})"]
+    return [f"{output_var} = cv2.medianBlur({a}, {k})"]
 
 
 GAUSSIAN_BLUR = OperationSpec(
@@ -88,9 +94,12 @@ def _bilateral(image: np.ndarray, d: int, sigma_color: float, sigma_space: float
     return cv2.bilateralFilter(image, int(d), float(sigma_color), float(sigma_space))
 
 
-def _bilateral_code(params: dict[str, Any]) -> list[str]:
+def _bilateral_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     return [
-        f"img = cv2.bilateralFilter(img, {int(params['d'])}, "
+        f"{output_var} = cv2.bilateralFilter({a}, {int(params['d'])}, "
         f"{float(params['sigma_color'])}, {float(params['sigma_space'])})"
     ]
 
@@ -103,15 +112,18 @@ def _nl_means(image: np.ndarray, strength: float, template_size: int, search_siz
     return cv2.fastNlMeansDenoising(image, None, float(strength), t, s)
 
 
-def _nl_means_code(params: dict[str, Any]) -> list[str]:
+def _nl_means_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     strength = float(params["strength"])
     t = max(3, int(params["template_size"]) | 1)
     s = max(t + 2, int(params["search_size"]) | 1)
     return [
-        "if img.ndim == 3:",
-        f"    img = cv2.fastNlMeansDenoisingColored(img, None, {strength}, {strength}, {t}, {s})",
+        f"if {a}.ndim == 3:",
+        f"    {output_var} = cv2.fastNlMeansDenoisingColored({a}, None, {strength}, {strength}, {t}, {s})",
         "else:",
-        f"    img = cv2.fastNlMeansDenoising(img, None, {strength}, {t}, {s})",
+        f"    {output_var} = cv2.fastNlMeansDenoising({a}, None, {strength}, {t}, {s})",
     ]
 
 

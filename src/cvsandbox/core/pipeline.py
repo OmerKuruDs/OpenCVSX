@@ -29,6 +29,22 @@ import numpy as np
 from cvsandbox.core.graph import Graph, GraphEdge, GraphNode, NodeId
 from cvsandbox.core.operation import OperationSpec
 
+SOURCE_SPEC = OperationSpec(
+    id="source.image",
+    name="Source",
+    category="Source",
+    description=(
+        "The loaded input image. Wire this output into any operation's input "
+        "port to feed it the original — useful for multi-input ops like Blend "
+        "or Apply Mask that need a reference to the unmodified source."
+    ),
+    parameters=(),
+    func=lambda image: image,  # never actually called — Graph.execute short-circuits zero-input nodes
+    input_ports=(),
+    output_ports=("image",),
+)
+SOURCE_NODE_ID = "__source__"
+
 
 def _fit_crop_to_destination(
     patch: np.ndarray,
@@ -124,6 +140,9 @@ class Pipeline:
     def __init__(self) -> None:
         self._graph = Graph()
         self._chain: list[NodeId] = []
+        self._source_node_id: NodeId = self._graph.add_node(
+            SOURCE_SPEC, node_id=SOURCE_NODE_ID
+        ).id
         self.roi: Roi | None = None
         self.roi_paste_to: tuple[int, int] | None = None
         """When set together with `roi`, the processed crop is spliced into
@@ -139,7 +158,21 @@ class Pipeline:
         return self._graph
 
     @property
+    def source_node_id(self) -> NodeId:
+        return self._source_node_id
+
+    def chain_index_of(self, node_id: NodeId) -> int:
+        """Return the chain position of `node_id`, or -1 if it is not a chain
+        node (e.g. the Source node)."""
+        try:
+            return self._chain.index(node_id)
+        except ValueError:
+            return -1
+
+    @property
     def nodes(self) -> list[GraphNode]:
+        """Chain operation nodes only — the implicit Source node is omitted so
+        existing iteration patterns keep working."""
         return [self._graph.get_node(nid) for nid in self._chain]
 
     def __len__(self) -> int:
@@ -149,9 +182,11 @@ class Pipeline:
 
     def add(self, spec: OperationSpec, params: dict[str, Any] | None = None) -> GraphNode:
         node = self._graph.add_node(spec, params=dict(params) if params else {})
-        if self._chain:
-            prev_id = self._chain[-1]
-            prev_spec = self._graph.get_node(prev_id).spec
+        # The first chain op auto-wires from the Source node so the user sees
+        # an explicit data-flow path from the original image into their pipeline.
+        prev_id = self._chain[-1] if self._chain else self._source_node_id
+        prev_spec = self._graph.get_node(prev_id).spec
+        if spec.input_ports:
             self._graph.add_edge(
                 GraphEdge(
                     source=prev_id,
@@ -194,6 +229,9 @@ class Pipeline:
     def clear(self) -> None:
         self._graph.clear()
         self._chain.clear()
+        self._source_node_id = self._graph.add_node(
+            SOURCE_SPEC, node_id=SOURCE_NODE_ID
+        ).id
         self.roi = None
         self.roi_paste_to = None
 
@@ -210,29 +248,30 @@ class Pipeline:
         )
 
     def _rebuild_chain_edges(self) -> None:
-        """Drop every existing chain-pattern edge (any output_ports[0] →
-        input_ports[0] edge between two chain nodes) and re-create them from
-        the current `_chain` order. User-drawn edges on other ports survive."""
-        chain_ids = set(self._chain)
+        """Drop every existing chain-pattern edge (output_ports[0] →
+        input_ports[0] between two adjacent nodes in the [Source, chain...]
+        sequence) and re-create them from the current order. User-drawn edges
+        on other ports survive."""
+        extended = [self._source_node_id, *self._chain]
+        extended_set = set(extended)
         for edge in list(self._graph.edges):
-            if edge.source not in chain_ids or edge.target not in chain_ids:
+            if edge.source not in extended_set or edge.target not in extended_set:
                 continue
             source_node = self._graph.get_node(edge.source)
             target_node = self._graph.get_node(edge.target)
+            if not target_node.spec.input_ports:
+                continue  # Source-style node cannot be a target
             if (
                 edge.source_port == source_node.spec.output_ports[0]
                 and edge.target_port == target_node.spec.input_ports[0]
             ):
                 self._graph.remove_edge(edge)
 
-        for i in range(len(self._chain) - 1):
-            chain_edge = self._chain_edge(self._chain[i], self._chain[i + 1])
+        for i in range(len(extended) - 1):
+            chain_edge = self._chain_edge(extended[i], extended[i + 1])
             try:
                 self._graph.add_edge(chain_edge)
             except ValueError:
-                # Either a user wire holds the same input port, or adding the
-                # edge would create a cycle with an existing user edge. Drop
-                # the conflicting user edges so the chain can be restored.
                 conflicts = [
                     e
                     for e in self._graph.edges
@@ -242,7 +281,9 @@ class Pipeline:
                 for e in conflicts:
                     self._graph.remove_edge(e)
                 self._graph.add_edge(chain_edge)
-        self._graph.output_node_id = self._chain[-1] if self._chain else None
+        self._graph.output_node_id = (
+            self._chain[-1] if self._chain else self._source_node_id
+        )
 
     # ------------------------------------------------------------------ execute
 

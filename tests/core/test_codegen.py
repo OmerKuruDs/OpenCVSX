@@ -25,7 +25,7 @@ def _no_export() -> OperationSpec:
 def test_empty_pipeline_emits_pass_body() -> None:
     code = generate_python_code(Pipeline())
     assert "def process(img: np.ndarray) -> np.ndarray:" in code
-    assert "pass" in code
+    assert "(empty pipeline)" in code
     assert code.rstrip().endswith("return img")
 
 
@@ -54,7 +54,9 @@ def test_gaussian_blur_bakes_odd_kernel() -> None:
     pipe = Pipeline()
     pipe.add(_spec("filtering.gaussian_blur"), {"ksize": 4, "sigma_x": 2.5})
     code = generate_python_code(pipe)
-    assert "cv2.GaussianBlur(img, (5, 5), 2.5)" in code
+    # Source is step_0; first chain op is step_1.
+    assert "cv2.GaussianBlur(step_0, (5, 5), 2.5)" in code
+    assert "step_1 = cv2.GaussianBlur" in code
 
 
 def test_node_index_and_name_appear_as_comment() -> None:
@@ -62,7 +64,8 @@ def test_node_index_and_name_appear_as_comment() -> None:
     pipe = Pipeline()
     pipe.add(_spec("filtering.gaussian_blur"))
     code = generate_python_code(pipe)
-    assert "# [0] Gaussian Blur" in code
+    # Source occupies topo index 0; the first user op is index 1.
+    assert "# [1] Gaussian Blur" in code
 
 
 def test_op_without_code_export_raises() -> None:
@@ -159,6 +162,47 @@ def test_roi_generated_pipeline_matches_runtime() -> None:
 
     assert isinstance(generated, np.ndarray)
     assert np.array_equal(live, generated)
+
+
+def test_dag_branching_generates_runnable_code_matching_runtime() -> None:
+    """Source fans out into Blur and Canny, then a Difference op merges them.
+    The exported code must use intermediate variables so each branch is
+    addressable, and the result must match Graph.execute byte-for-byte."""
+    from cvsandbox.core.graph import GraphEdge
+
+    load_builtin_operations()
+    pipe = Pipeline()
+    blur = pipe.add(_spec("filtering.gaussian_blur"), {"ksize": 5, "sigma_x": 1.5})
+    diff = pipe.add(_spec("composite.difference"))
+    # Chain auto-wired Blur → Difference.a. Wire Source → Difference.b for the
+    # second input, turning the pipeline into a true diamond (source forks).
+    pipe.graph.add_edge(
+        GraphEdge(
+            source=pipe.source_node_id,
+            source_port="image",
+            target=diff.id,
+            target_port="b",
+        )
+    )
+
+    rng = np.random.default_rng(1)
+    img = rng.integers(0, 256, size=(40, 40, 3), dtype=np.uint8)
+
+    live = pipe.execute(img)
+
+    code = generate_python_code(pipe)
+    namespace: dict[str, object] = {}
+    exec(compile(code, "<generated>", "exec"), namespace)
+    process = namespace["process"]
+    generated = process(img.copy())  # type: ignore[operator]
+
+    assert np.array_equal(live, generated)
+    # Make sure the topology is actually expressed in code: blur's output and
+    # source's output both fed into Difference, so both var names appear.
+    assert blur.id  # unused but documents the intent
+    assert "step_" in code
+    # Two different inputs into cv2.absdiff means at least two step vars used.
+    assert code.count("step_") >= 3
 
 
 def _spec(spec_id: str) -> OperationSpec:

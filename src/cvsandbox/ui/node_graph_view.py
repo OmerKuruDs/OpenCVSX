@@ -59,23 +59,25 @@ PORT_GAP = 14  # vertical gap between adjacent ports on the same edge
 PORT_HIT_PAD = 3  # extra forgiveness around each port for mouse hit-testing
 PORT_BOUND_PAD = 2 * PORT_RADIUS + PORT_HIT_PAD + 2  # space the boundingRect needs to grant on either side
 
-EDGE_COLOR = QColor("#5b6470")
+EDGE_COLOR = QColor("#0891b2")
 EDGE_WIDTH = 2
-PORT_FILL = QColor("#1d2129")
-PORT_BORDER = QColor("#cfd6df")
+PORT_FILL = QColor("#ffffff")
+PORT_BORDER = QColor("#0e7490")
 
 DISABLED_ALPHA = 110
 
 _CATEGORY_COLORS: dict[str, QColor] = {
-    "Filtering": QColor("#3f7bd6"),
-    "Threshold": QColor("#22a06b"),
-    "Morphology": QColor("#b25cd0"),
-    "Edge": QColor("#d6873f"),
-    "Color": QColor("#d63f7b"),
-    "Geometric": QColor("#3fb8d6"),
-    "Analysis": QColor("#c9b542"),
+    "Filtering": QColor("#67e8f9"),   # bright cyan
+    "Threshold": QColor("#86efac"),   # pastel mint
+    "Morphology": QColor("#c4b5fd"),  # pastel violet
+    "Edge": QColor("#fdba74"),         # pastel orange
+    "Color": QColor("#f9a8d4"),        # pastel pink
+    "Geometric": QColor("#7dd3fc"),    # sky
+    "Analysis": QColor("#fde68a"),     # pastel yellow
+    "Composite": QColor("#a78bfa"),    # vivid violet
+    "Source": QColor("#94a3b8"),       # slate
 }
-_DEFAULT_CATEGORY_COLOR = QColor("#7d8590")
+_DEFAULT_CATEGORY_COLOR = QColor("#cbd5e1")
 
 
 def format_duration(seconds: float) -> str:
@@ -110,15 +112,18 @@ class NodeItem(QGraphicsObject):
     def __init__(
         self,
         index: int,
+        node_id: str,
         title: str,
         category: str,
         enabled: bool,
         input_ports: tuple[str, ...] = ("in",),
         output_ports: tuple[str, ...] = ("out",),
+        is_source: bool = False,
         parent: QGraphicsItem | None = None,
     ) -> None:
         super().__init__(parent)
         self.index = index
+        self.node_id = node_id
         self.title = title
         self.category = category
         self.enabled = enabled
@@ -126,8 +131,12 @@ class NodeItem(QGraphicsObject):
         self.selected = False
         self.input_ports = input_ports
         self.output_ports = output_ports
+        self.is_source = is_source
         self._color = _category_color(category)
         self._dragged = False
+        # Source is freely movable like any other node — the user can park it
+        # wherever the wires look tidiest. Chips are still suppressed so it
+        # remains non-removable and always enabled.
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
         self.setAcceptHoverEvents(True)
@@ -163,7 +172,7 @@ class NodeItem(QGraphicsObject):
             body_color.setAlpha(DISABLED_ALPHA)
         painter.setBrush(QBrush(body_color))
 
-        border_color = QColor("#ffd866") if self.selected else QColor("#1d2129")
+        border_color = QColor("#0891b2") if self.selected else QColor("#94a3b8")
         border_width = 3 if self.selected else 1
         painter.setPen(QPen(border_color, border_width))
         painter.drawRoundedRect(rect, 10, 10)
@@ -175,8 +184,8 @@ class NodeItem(QGraphicsObject):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(strip, 3, 3)
 
-        # Title.
-        painter.setPen(QColor("#ffffff"))
+        # Title — dark navy reads well on the pastel category fills.
+        painter.setPen(QColor("#0b1437"))
         title_font = QFont(painter.font())
         title_font.setBold(True)
         painter.setFont(title_font)
@@ -192,7 +201,7 @@ class NodeItem(QGraphicsObject):
         info_font.setBold(False)
         info_font.setPointSize(max(7, info_font.pointSize() - 2))
         painter.setFont(info_font)
-        painter.setPen(QColor("#e6e6e6"))
+        painter.setPen(QColor("#475569"))
         info_text = self.category
         if self.timing is not None:
             info_text = f"{self.category}  ·  {format_duration(self.timing)}"
@@ -211,26 +220,28 @@ class NodeItem(QGraphicsObject):
         for center in self._port_centers(self.output_ports, side="right"):
             painter.drawEllipse(center, PORT_RADIUS, PORT_RADIUS)
 
-        # Toggle chip (top-left within the body).
-        toggle_center = self._toggle_chip_center()
-        painter.setPen(QPen(QColor("#1d2129"), 1))
-        painter.setBrush(QColor("#cef1d2") if self.enabled else QColor("#3a3f48"))
-        painter.drawEllipse(toggle_center, CHIP_RADIUS, CHIP_RADIUS)
+        # Source nodes are immutable controls — skip the toggle/remove chips.
+        if not self.is_source:
+            # Toggle chip (top-left within the body).
+            toggle_center = self._toggle_chip_center()
+            painter.setPen(QPen(QColor("#1d2129"), 1))
+            painter.setBrush(QColor("#cef1d2") if self.enabled else QColor("#3a3f48"))
+            painter.drawEllipse(toggle_center, CHIP_RADIUS, CHIP_RADIUS)
 
-        # Remove chip (top-right).
-        remove_center = self._remove_chip_center()
-        painter.setBrush(QColor("#3a3f48"))
-        painter.drawEllipse(remove_center, CHIP_RADIUS, CHIP_RADIUS)
-        painter.setPen(QPen(QColor("#ffffff"), 1.5))
-        offset = CHIP_RADIUS - 3
-        painter.drawLine(
-            QPointF(remove_center.x() - offset, remove_center.y() - offset),
-            QPointF(remove_center.x() + offset, remove_center.y() + offset),
-        )
-        painter.drawLine(
-            QPointF(remove_center.x() - offset, remove_center.y() + offset),
-            QPointF(remove_center.x() + offset, remove_center.y() - offset),
-        )
+            # Remove chip (top-right).
+            remove_center = self._remove_chip_center()
+            painter.setBrush(QColor("#3a3f48"))
+            painter.drawEllipse(remove_center, CHIP_RADIUS, CHIP_RADIUS)
+            painter.setPen(QPen(QColor("#ffffff"), 1.5))
+            offset = CHIP_RADIUS - 3
+            painter.drawLine(
+                QPointF(remove_center.x() - offset, remove_center.y() - offset),
+                QPointF(remove_center.x() + offset, remove_center.y() + offset),
+            )
+            painter.drawLine(
+                QPointF(remove_center.x() - offset, remove_center.y() + offset),
+                QPointF(remove_center.x() + offset, remove_center.y() - offset),
+            )
 
     # ------------------------------------------------------------------ hit-tests
 
@@ -309,16 +320,18 @@ class NodeItem(QGraphicsObject):
                 self.input_port_pressed.emit(self.index, port_name)
             event.accept()  # never start a node move when grabbing a port
             return
-        if self._hit_chip(pos, self._toggle_chip_center()):
-            self.enabled = not self.enabled
-            self.update()
-            self.enable_toggled.emit(self.index)
-            event.accept()
-            return
-        if self._hit_chip(pos, self._remove_chip_center()):
-            self.remove_requested.emit(self.index)
-            event.accept()
-            return
+        # Chip interactions don't apply to the Source node.
+        if not self.is_source:
+            if self._hit_chip(pos, self._toggle_chip_center()):
+                self.enabled = not self.enabled
+                self.update()
+                self.enable_toggled.emit(self.index)
+                event.accept()
+                return
+            if self._hit_chip(pos, self._remove_chip_center()):
+                self.remove_requested.emit(self.index)
+                event.accept()
+                return
         self._dragged = False
         self.body_clicked.emit(self.index)
         super().mousePressEvent(event)
@@ -391,7 +404,8 @@ class NodeGraphView(QGraphicsView):
         self._scene = QGraphicsScene(self)
         self.setScene(self._scene)
         self.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        self.setBackgroundBrush(QColor("#23272e"))
+        # Pale cool background ties the graph into the global pastel theme.
+        self.setBackgroundBrush(QColor("#f1f5f9"))
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setMinimumHeight(NODE_HEIGHT + 2 * SCENE_MARGIN + 16)
@@ -410,17 +424,39 @@ class NodeGraphView(QGraphicsView):
         self._edges.clear()
         self._pending_wire = None  # was a child of scene — already gone
 
-        for i, node in enumerate(self._pipeline.nodes):
+        source_id = self._pipeline.source_node_id
+
+        # Render in graph order: Source first, then chain ops. Source occupies
+        # column 0 of the auto-layout so chain ops keep their familiar positions.
+        ordered_graph_nodes = [
+            self._pipeline.graph.get_node(source_id),
+            *self._pipeline.nodes,
+        ]
+        for i, node in enumerate(ordered_graph_nodes):
+            is_source = node.id == source_id
+            chain_index = self._pipeline.chain_index_of(node.id)
             item = NodeItem(
                 index=i,
+                node_id=node.id,
                 title=node.spec.name,
                 category=node.spec.category,
                 enabled=node.enabled,
                 input_ports=node.spec.input_ports,
                 output_ports=node.spec.output_ports,
+                is_source=is_source,
             )
-            item.setPos(_layout_x(i), SCENE_MARGIN)
-            item.timing = self._timings[i] if i < len(self._timings) else None
+            # Honour a persisted position from a previous drag (Source included);
+            # otherwise auto-layout. Source defaults to column 0, chain nodes
+            # cascade rightwards from column 1.
+            if node.position is not None:
+                item.setPos(node.position[0], node.position[1])
+            elif is_source:
+                item.setPos(_layout_x(0), SCENE_MARGIN)
+            else:
+                item.setPos(_layout_x(i), SCENE_MARGIN)
+            # Timings are indexed by chain position; Source has no timing.
+            if not is_source and 0 <= chain_index < len(self._timings):
+                item.timing = self._timings[chain_index]
             self._scene.addItem(item)
             self._nodes.append(item)
             self._nodes_by_id[node.id] = item
@@ -466,10 +502,21 @@ class NodeGraphView(QGraphicsView):
         self.selection_changed.emit(index)
 
     def set_timings(self, timings: Sequence[float | None]) -> None:
+        """Update per-chain-node timing. Source is excluded — it has no
+        execution step. Iteration walks the chain in order."""
         self._timings = list(timings)
-        for i, node_item in enumerate(self._nodes):
-            node_item.timing = self._timings[i] if i < len(self._timings) else None
+        chain_index = 0
+        for node_item in self._nodes:
+            if node_item.is_source:
+                node_item.timing = None
+                continue
+            node_item.timing = (
+                self._timings[chain_index]
+                if chain_index < len(self._timings)
+                else None
+            )
             node_item.update()
+            chain_index += 1
 
     def clear_timings(self) -> None:
         self.set_timings([None] * len(self._pipeline.nodes))
@@ -484,55 +531,52 @@ class NodeGraphView(QGraphicsView):
 
     def _on_node_clicked(self, index: int) -> None:
         self._apply_selection(index)
-        self.selection_changed.emit(index)
+        # Selection signal carries chain index for ParameterPanel compatibility;
+        # clicking the Source node clears the param panel (chain index = -1).
+        node_id = self._nodes[index].node_id
+        self.selection_changed.emit(self._pipeline.chain_index_of(node_id))
 
     def _on_node_toggled(self, index: int) -> None:
-        if 0 <= index < len(self._pipeline.nodes):
-            self._pipeline.nodes[index].enabled = self._nodes[index].enabled
-            self.pipeline_changed.emit()
+        if not (0 <= index < len(self._nodes)):
+            return
+        node_id = self._nodes[index].node_id
+        self._pipeline.graph.get_node(node_id).enabled = self._nodes[index].enabled
+        self.pipeline_changed.emit()
 
     def _on_node_remove_requested(self, index: int) -> None:
-        if not (0 <= index < len(self._pipeline.nodes)):
+        if not (0 <= index < len(self._nodes)):
             return
-        self._pipeline.remove(index)
-        # Drop the matching timing so subsequent renders show no stale data.
-        if index < len(self._timings):
-            del self._timings[index]
-        new_selection = (
-            self._selected_index
-            if self._selected_index < index
-            else self._selected_index - 1
-        )
-        self._selected_index = max(-1, min(new_selection, len(self._pipeline.nodes) - 1))
+        node_id = self._nodes[index].node_id
+        chain_index = self._pipeline.chain_index_of(node_id)
+        if chain_index < 0:
+            return  # Source node — not removable
+        self._pipeline.remove(chain_index)
+        if chain_index < len(self._timings):
+            del self._timings[chain_index]
+        if self._selected_index == index:
+            self._selected_index = -1
+        elif self._selected_index > index:
+            self._selected_index -= 1
         self.refresh()
-        self.selection_changed.emit(self._selected_index)
+        sel_node = (
+            self._nodes[self._selected_index]
+            if 0 <= self._selected_index < len(self._nodes)
+            else None
+        )
+        self.selection_changed.emit(
+            self._pipeline.chain_index_of(sel_node.node_id) if sel_node else -1
+        )
         self.pipeline_changed.emit()
 
     def _on_node_drag_released(self, index: int) -> None:
-        # Recompute pipeline order from current x positions of every node.
-        order = sorted(range(len(self._nodes)), key=lambda i: self._nodes[i].pos().x())
-        if order == list(range(len(self._nodes))):
-            # No actual reorder — snap the dragged node back onto its slot.
-            self._snap_to_layout()
+        """Persist the dropped position on the GraphNode (including the Source
+        node) so it survives refreshes and serialization round-trips."""
+        if not (0 <= index < len(self._nodes)):
             return
-
-        # Remap timings before mutating the pipeline.
-        if self._timings:
-            old_timings = list(self._timings)
-            self._timings = [
-                old_timings[idx] if 0 <= idx < len(old_timings) else None
-                for idx in order
-            ]
-        self._pipeline.reorder(order)
-        # Selection follows the moved node into its new slot.
-        if self._selected_index in order:
-            self._selected_index = order.index(self._selected_index)
-        self.refresh()
-        self.pipeline_changed.emit()
-
-    def _snap_to_layout(self) -> None:
-        for i, item in enumerate(self._nodes):
-            item.setPos(_layout_x(i), SCENE_MARGIN)
+        item = self._nodes[index]
+        pos = item.pos()
+        node = self._pipeline.graph.get_node(item.node_id)
+        node.position = (pos.x(), pos.y())
 
     # ---------------------------------------------------------- drag-to-connect
 
@@ -547,7 +591,7 @@ class NodeGraphView(QGraphicsView):
         re-target or release into empty space to detach."""
         if not (0 <= index < len(self._nodes)):
             return
-        target_id = self._pipeline.nodes[index].id
+        target_id = self._nodes[index].node_id
         existing = next(
             (
                 e
@@ -633,14 +677,12 @@ class NodeGraphView(QGraphicsView):
         if target_item is source_item:
             return  # cannot wire a node back into itself
 
-        src_node = self._pipeline.nodes[source_item.index]
-        tgt_node = self._pipeline.nodes[target_item.index]
         try:
             self._pipeline.graph.add_edge(
                 GraphEdge(
-                    source=src_node.id,
+                    source=source_item.node_id,
                     source_port=source_port,
-                    target=tgt_node.id,
+                    target=target_item.node_id,
                     target_port=target_port,
                 )
             )

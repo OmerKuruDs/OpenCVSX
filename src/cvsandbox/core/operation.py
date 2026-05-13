@@ -16,13 +16,22 @@ import numpy as np
 ParamKind = Literal["int", "float", "bool", "choice", "kernel_size"]
 
 OperationFunc = Callable[..., np.ndarray]
-CodeExporter = Callable[[dict[str, Any]], list[str]]
+CodeExporter = Callable[[dict[str, Any], tuple[str, ...], str], list[str]]
 """Returns the Python source lines that reproduce this op for given params.
 
-Each line operates on a variable named `img` (read and reassigned). The lines
-must be self-contained — no shared helpers beyond `cv2` and `np`. The exporter
-is responsible for baking literal values (post-clamping, post-odd-forcing) so
-the generated code mirrors what `func` would do at runtime.
+Signature: ``code_export(params, input_vars, output_var) -> list[str]``.
+
+* ``params`` — the same dict ``func`` would receive at runtime.
+* ``input_vars`` — variable names already holding each upstream input, in the
+  positional order ``spec.input_ports`` declares. A single-input op gets a
+  one-tuple; a multi-input op (Blend, Apply Mask, ...) gets one entry per port.
+* ``output_var`` — the variable the lines must assign the result to so
+  downstream steps can refer to it.
+
+The lines must be self-contained — no shared helpers beyond ``cv2``, ``np``,
+and short ``_``-prefixed local temporaries reset per node. The exporter bakes
+literal values (post-clamping, post-odd-forcing) so the generated code mirrors
+what ``func`` does at runtime.
 """
 
 

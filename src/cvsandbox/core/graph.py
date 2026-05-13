@@ -46,7 +46,11 @@ class GraphNode:
     id: NodeId = field(default_factory=_auto_node_id)
     params: dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
-    position: tuple[float, float] = (0.0, 0.0)
+    position: tuple[float, float] | None = None
+    """Persisted (x, y) of the node in the editor's scene coords. None means
+    the UI should auto-layout this node; once the user drags it, the resulting
+    position is stored here so it survives refreshes and round-trips through
+    serialization."""
 
     def __post_init__(self) -> None:
         defaults = self.spec.default_params()
@@ -93,7 +97,7 @@ class Graph:
         self,
         spec: OperationSpec,
         params: dict[str, Any] | None = None,
-        position: tuple[float, float] = (0.0, 0.0),
+        position: tuple[float, float] | None = None,
         node_id: NodeId | None = None,
     ) -> GraphNode:
         if node_id is None:
@@ -169,8 +173,16 @@ class Graph:
 
         for nid in order:
             node = self._nodes[nid]
-            inputs_by_port = self._collect_inputs(nid, outputs)
 
+            # Zero-input nodes are source-style: they emit the graph's input
+            # image on every output port without invoking their func. This lets
+            # the UI surface an explicit "Source" node that other operations
+            # can wire from.
+            if not node.spec.input_ports:
+                outputs[nid] = dict.fromkeys(node.spec.output_ports, image)
+                continue
+
+            inputs_by_port = self._collect_inputs(nid, outputs)
             input_args = []
             for port in node.spec.input_ports:
                 if port in inputs_by_port:

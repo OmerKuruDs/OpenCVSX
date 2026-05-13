@@ -14,8 +14,6 @@ import numpy as np
 
 from cvsandbox.core.operation import OperationSpec, Parameter
 
-_TO_GRAY_LINE = "img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img"
-
 
 def _to_gray(image: np.ndarray) -> np.ndarray:
     if image.ndim == 3:
@@ -43,20 +41,33 @@ _ADAPTIVE_METHODS = {
 }
 
 
-def _binary_code(params: dict[str, Any]) -> list[str]:
+def _to_gray_line(in_var: str, out_var: str) -> str:
+    return (
+        f"{out_var} = cv2.cvtColor({in_var}, cv2.COLOR_BGR2GRAY) "
+        f"if {in_var}.ndim == 3 else {in_var}"
+    )
+
+
+def _binary_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     mode = "cv2.THRESH_BINARY_INV" if params["inverse"] else "cv2.THRESH_BINARY"
     return [
-        _TO_GRAY_LINE,
-        f"_, img = cv2.threshold(img, {float(params['thresh'])}, "
+        _to_gray_line(a, output_var),
+        f"_, {output_var} = cv2.threshold({output_var}, {float(params['thresh'])}, "
         f"{float(params['maxval'])}, {mode})",
     ]
 
 
-def _otsu_code(params: dict[str, Any]) -> list[str]:
+def _otsu_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     base = "cv2.THRESH_BINARY_INV" if params["inverse"] else "cv2.THRESH_BINARY"
     return [
-        _TO_GRAY_LINE,
-        f"_, img = cv2.threshold(img, 0, {float(params['maxval'])}, "
+        _to_gray_line(a, output_var),
+        f"_, {output_var} = cv2.threshold({output_var}, 0, {float(params['maxval'])}, "
         f"{base} | cv2.THRESH_OTSU)",
     ]
 
@@ -67,13 +78,16 @@ _ADAPTIVE_CODE_CONSTS = {
 }
 
 
-def _adaptive_code(params: dict[str, Any]) -> list[str]:
+def _adaptive_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     method_const = _ADAPTIVE_CODE_CONSTS[params["method"]]
     block = max(3, int(params["block_size"]) | 1)
     mode = "cv2.THRESH_BINARY_INV" if params["inverse"] else "cv2.THRESH_BINARY"
     return [
-        _TO_GRAY_LINE,
-        f"img = cv2.adaptiveThreshold(img, {float(params['maxval'])}, "
+        _to_gray_line(a, output_var),
+        f"{output_var} = cv2.adaptiveThreshold({output_var}, {float(params['maxval'])}, "
         f"{method_const}, {mode}, {block}, {float(params['c'])})",
     ]
 

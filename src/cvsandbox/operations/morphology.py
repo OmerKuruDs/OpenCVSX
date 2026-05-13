@@ -30,39 +30,53 @@ _SHAPE_CONSTS = {
 def _kernel_line(params: dict[str, Any]) -> str:
     k = max(1, int(params["ksize"]) | 1)
     return (
-        f"kernel = cv2.getStructuringElement("
+        f"_kernel = cv2.getStructuringElement("
         f"{_SHAPE_CONSTS[params['shape']]}, ({k}, {k}))"
     )
 
 
-def _erode_code(params: dict[str, Any]) -> list[str]:
+def _erode_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     return [
         _kernel_line(params),
-        f"img = cv2.erode(img, kernel, iterations={int(params['iterations'])})",
+        f"{output_var} = cv2.erode({a}, _kernel, iterations={int(params['iterations'])})",
     ]
 
 
-def _dilate_code(params: dict[str, Any]) -> list[str]:
+def _dilate_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     return [
         _kernel_line(params),
-        f"img = cv2.dilate(img, kernel, iterations={int(params['iterations'])})",
+        f"{output_var} = cv2.dilate({a}, _kernel, iterations={int(params['iterations'])})",
     ]
 
 
-def _morph_ex_code(op_const: str, params: dict[str, Any]) -> list[str]:
+def _morph_ex_code(
+    op_const: str, params: dict[str, Any], input_var: str, output_var: str
+) -> list[str]:
     return [
         _kernel_line(params),
-        f"img = cv2.morphologyEx(img, {op_const}, kernel, "
+        f"{output_var} = cv2.morphologyEx({input_var}, {op_const}, _kernel, "
         f"iterations={int(params['iterations'])})",
     ]
 
 
-def _open_code(params: dict[str, Any]) -> list[str]:
-    return _morph_ex_code("cv2.MORPH_OPEN", params)
+def _open_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    return _morph_ex_code("cv2.MORPH_OPEN", params, a, output_var)
 
 
-def _close_code(params: dict[str, Any]) -> list[str]:
-    return _morph_ex_code("cv2.MORPH_CLOSE", params)
+def _close_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    return _morph_ex_code("cv2.MORPH_CLOSE", params, a, output_var)
 
 
 def _kernel(shape: str, ksize: int) -> np.ndarray:

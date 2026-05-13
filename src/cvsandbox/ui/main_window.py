@@ -33,24 +33,32 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QSplitter,
     QStatusBar,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from cvsandbox.core.codegen import generate_python_code
+from cvsandbox.core.image_io import read_image
 from cvsandbox.core.pipeline import Pipeline, Roi
 from cvsandbox.core.registry import get_operation
 from cvsandbox.core.serialization import load as load_pipeline
 from cvsandbox.core.serialization import save as save_pipeline
+from cvsandbox.core.video import VideoRecorder, VideoSource
 from cvsandbox.resources import ICON_PATH
+from cvsandbox.ui.batch_dialog import BatchDialog
 from cvsandbox.ui.code_export_dialog import CodeExportDialog
+from cvsandbox.ui.dataset_page import DatasetPage
+from cvsandbox.ui.help_dialog import HelpDialog
 from cvsandbox.ui.histogram_panel import HistogramPanel
+from cvsandbox.ui.image_action_bar import ImageActionBar
 from cvsandbox.ui.image_tools_panel import ImageToolsPanel
 from cvsandbox.ui.image_view import ImageViewWidget
 from cvsandbox.ui.node_graph_view import NodeGraphView
 from cvsandbox.ui.operation_catalog import OperationCatalog
 from cvsandbox.ui.parameter_panel import ParameterPanel
 from cvsandbox.ui.pipeline_worker import PipelineRequest, PipelineWorker
+from cvsandbox.ui.video_feed_controller import VideoFeedController
 
 DEBOUNCE_MS = 120
 PREVIEW_MAX_DIM = 1600  # longest-side cap for downscaled-preview mode
@@ -107,17 +115,23 @@ class MainWindow(QMainWindow):
         right_panel.setMinimumWidth(280)
         self._image_view.setMinimumWidth(360)
 
-        # Image view + Image tools sidebar live in one composite widget so the
-        # sidebar tracks the image area; the splitter handles the left catalog
-        # and right param/histogram column. The sidebar itself is non-resizable
-        # (fixed width inside the composite).
+        # Image view + Image tools sidebar + an action bar live in one composite
+        # widget. The sidebar tracks the image area on the right; the action bar
+        # sits directly underneath so File-menu staples (Open / Save / Record)
+        # are always one click away.
         self._image_with_tools = QWidget(self)
-        image_with_tools_layout = QHBoxLayout(self._image_with_tools)
-        image_with_tools_layout.setContentsMargins(0, 0, 0, 0)
-        image_with_tools_layout.setSpacing(0)
-        image_with_tools_layout.addWidget(self._image_view, 1)
-        # `self._tools_panel` is created in __init__ AFTER the menu builds its
-        # QActions; it is parented and inserted in `_install_tools_sidebar`.
+        composite_layout = QVBoxLayout(self._image_with_tools)
+        composite_layout.setContentsMargins(0, 0, 0, 0)
+        composite_layout.setSpacing(0)
+        self._image_row = QWidget(self._image_with_tools)
+        image_row_layout = QHBoxLayout(self._image_row)
+        image_row_layout.setContentsMargins(0, 0, 0, 0)
+        image_row_layout.setSpacing(0)
+        image_row_layout.addWidget(self._image_view, 1)
+        composite_layout.addWidget(self._image_row, 1)
+        # `self._tools_panel` and the action bar are wired in after the menu
+        # builds its QActions; see `_install_tools_sidebar` and
+        # `_install_action_bar`.
 
         top_splitter = QSplitter(self)
         top_splitter.addWidget(self._catalog)
@@ -135,11 +149,45 @@ class MainWindow(QMainWindow):
         top_splitter.setSizes([200, 860, 340])
         self._top_splitter = top_splitter
 
-        central = QWidget(self)
-        central_layout = QVBoxLayout(central)
-        central_layout.addWidget(top_splitter, 5)
-        central_layout.addWidget(self._pipeline_view, 1)
-        self.setCentralWidget(central)
+        # Vertical splitter between the main work area (image + side panels) and
+        # the node graph at the bottom. The drag handle lets the user trade
+        # vertical space — useful once nodes are positioned freely and the graph
+        # area starts to feel cramped.
+        vertical_splitter = QSplitter(Qt.Orientation.Vertical, self)
+        vertical_splitter.addWidget(top_splitter)
+        vertical_splitter.addWidget(self._pipeline_view)
+        vertical_splitter.setStretchFactor(0, 5)
+        vertical_splitter.setStretchFactor(1, 1)
+        vertical_splitter.setCollapsible(0, False)
+        vertical_splitter.setCollapsible(1, False)
+        # Reasonable defaults for a 900-tall window — about 700 px for the
+        # image area, 200 px for the graph strip.
+        vertical_splitter.setSizes([700, 200])
+        self._pipeline_view.setMinimumHeight(80)
+        self._vertical_splitter = vertical_splitter
+
+        # Editor "page" — wraps the existing image / panels / node graph stack.
+        editor_page = QWidget(self)
+        editor_layout = QVBoxLayout(editor_page)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.addWidget(vertical_splitter)
+
+        # Dataset gallery "page" — same window, different tab. Clicking a
+        # thumbnail flips back to the Editor tab with that image loaded.
+        self._dataset_page = DatasetPage(self)
+        self._dataset_page.image_chosen.connect(self._on_dataset_image_chosen)
+
+        self._tabs = QTabWidget(self)
+        self._tabs.setDocumentMode(True)
+        self._editor_tab_index = self._tabs.addTab(editor_page, "Editor")
+        self._dataset_tab_index = self._tabs.addTab(self._dataset_page, "Dataset")
+        self.setCentralWidget(self._tabs)
+
+        self._video_controller = VideoFeedController(self)
+        self._video_controller.frame_ready.connect(self._on_video_frame)
+        self._video_controller.finished.connect(self._on_video_finished)
+        self._recorder: VideoRecorder | None = None
+        self._help_dialog: HelpDialog | None = None
 
         self.setStatusBar(QStatusBar(self))
         self._build_menu()
@@ -153,28 +201,89 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self._install_tools_sidebar()
+        self._install_action_bar()
         self._setup_worker()
         self._setup_debouncer()
         self._wire_signals()
 
     def _install_tools_sidebar(self) -> None:
-        """Attach the ImageToolsPanel into the image composite. Called after
-        the View-menu actions exist so the panel can bind to them."""
+        """Attach the ImageToolsPanel next to the image. Called after the View-
+        menu actions exist so the panel can bind to them."""
+        row_layout = self._image_row.layout()
+        assert row_layout is not None
+        row_layout.addWidget(self._tools_panel)
+
+    def _install_action_bar(self) -> None:
+        """Attach the ImageActionBar below the image row. Wires File-menu
+        actions to the new toolbar so the menu remains the source of truth."""
+        self._action_bar = ImageActionBar(
+            open_image_action=self._open_image_action,
+            open_dataset_action=self._open_dataset_action,
+            open_camera_action=self._open_camera_action,
+            open_video_action=self._open_video_action,
+            save_image_action=self._save_image_action,
+            record_action=self._record_action,
+            stop_recording_action=self._stop_recording_action,
+            stop_capture_action=self._stop_capture_action,
+            parent=self._image_with_tools,
+        )
         layout = self._image_with_tools.layout()
         assert layout is not None
-        layout.addWidget(self._tools_panel)
+        layout.addWidget(self._action_bar)
 
     def _build_menu(self) -> None:
         self._build_file_menu()
         self._build_view_menu()
+        self._build_help_menu()
+
+    def _build_help_menu(self) -> None:
+        help_menu = self.menuBar().addMenu("&Help")
+        guide_action = QAction("&Operation Guide…", self)
+        guide_action.setShortcut("F1")
+        guide_action.triggered.connect(self._on_show_help)
+        help_menu.addAction(guide_action)
 
     def _build_file_menu(self) -> None:
         file_menu = self.menuBar().addMenu("&File")
 
-        open_image_action = QAction("&Open Image…", self)
-        open_image_action.setShortcut(QKeySequence.StandardKey.Open)
-        open_image_action.triggered.connect(self._on_open)
-        file_menu.addAction(open_image_action)
+        self._open_image_action = QAction("&Open Image…", self)
+        self._open_image_action.setShortcut(QKeySequence.StandardKey.Open)
+        self._open_image_action.triggered.connect(self._on_open)
+        file_menu.addAction(self._open_image_action)
+
+        self._open_dataset_action = QAction("Open &Dataset…", self)
+        self._open_dataset_action.setShortcut("Ctrl+D")
+        self._open_dataset_action.triggered.connect(self._on_open_dataset)
+        file_menu.addAction(self._open_dataset_action)
+
+        self._open_camera_action = QAction("Open &Camera", self)
+        self._open_camera_action.triggered.connect(self._on_open_camera)
+        file_menu.addAction(self._open_camera_action)
+
+        self._open_video_action = QAction("Open &Video…", self)
+        self._open_video_action.triggered.connect(self._on_open_video)
+        file_menu.addAction(self._open_video_action)
+
+        self._stop_capture_action = QAction("&Stop Capture", self)
+        self._stop_capture_action.triggered.connect(self._on_stop_capture)
+        self._stop_capture_action.setEnabled(False)
+        file_menu.addAction(self._stop_capture_action)
+
+        file_menu.addSeparator()
+
+        self._save_image_action = QAction("Save Processed &Image…", self)
+        self._save_image_action.setShortcut("Ctrl+S")
+        self._save_image_action.triggered.connect(self._on_save_image)
+        file_menu.addAction(self._save_image_action)
+
+        self._record_action = QAction("&Record Video…", self)
+        self._record_action.triggered.connect(self._on_record_video)
+        file_menu.addAction(self._record_action)
+
+        self._stop_recording_action = QAction("S&top Recording", self)
+        self._stop_recording_action.triggered.connect(self._on_stop_recording)
+        self._stop_recording_action.setEnabled(False)
+        file_menu.addAction(self._stop_recording_action)
 
         file_menu.addSeparator()
 
@@ -198,6 +307,10 @@ class MainWindow(QMainWindow):
         export_code_action.setShortcut("Ctrl+E")
         export_code_action.triggered.connect(self._on_export_code)
         file_menu.addAction(export_code_action)
+
+        batch_action = QAction("&Bulk Export Dataset…", self)
+        batch_action.triggered.connect(self._on_batch_process)
+        file_menu.addAction(batch_action)
 
         file_menu.addSeparator()
 
@@ -278,12 +391,69 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
-        image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        image = read_image(path)
         if image is None:
             QMessageBox.warning(self, "Open failed", f"Could not read image: {path}")
             return
+        self._stop_capture_if_active()
         self._source_image = image
         self._refresh_preview_source(path_for_status=path)
+
+    def _on_open_camera(self) -> None:
+        self._start_capture(0, label="Camera")
+
+    def _on_open_video(self) -> None:
+        path, _filter = QFileDialog.getOpenFileName(
+            self,
+            "Open Video",
+            str(Path.home()),
+            "Videos (*.mp4 *.mov *.avi *.mkv *.webm)",
+        )
+        if not path:
+            return
+        self._start_capture(path, label=path)
+
+    def _on_stop_capture(self) -> None:
+        self._stop_capture_if_active()
+        self.statusBar().showMessage("Capture stopped")
+
+    def _start_capture(self, source: int | str, *, label: str) -> None:
+        try:
+            video_source = VideoSource(source)
+            self._video_controller.start(video_source)
+        except RuntimeError as exc:
+            QMessageBox.warning(self, "Capture failed", str(exc))
+            return
+        self._stop_capture_action.setEnabled(True)
+        self.statusBar().showMessage(f"Streaming from {label}")
+
+    def _stop_capture_if_active(self) -> None:
+        if self._video_controller.is_active():
+            self._video_controller.stop()
+        self._stop_capture_action.setEnabled(False)
+
+    def _on_video_frame(self, frame: object) -> None:
+        if not isinstance(frame, np.ndarray):
+            self._video_controller.mark_processed()
+            return
+        self._source_image = frame
+        # Mirror the static-image path but skip the debounce — the controller
+        # already gates frame arrivals on the worker being free.
+        self._preview_source = (
+            downscale_for_preview(self._source_image)
+            if self._downscale_enabled
+            else self._source_image
+        )
+        self._image_view.set_before(self._preview_source)
+        self._image_view.set_roi(self._pipeline_roi_in_preview_coords())
+        self._image_view.set_paste_rect(self._pipeline_paste_rect_in_preview_coords())
+        self._dispatch_preview()
+
+    def _on_video_finished(self) -> None:
+        self._stop_capture_action.setEnabled(False)
+        if self._recorder is not None:
+            self._on_stop_recording()
+        self.statusBar().showMessage("Capture finished")
 
     def _refresh_preview_source(self, path_for_status: str | None = None) -> None:
         """Rebuild `_preview_source` from `_source_image`, applying downscale
@@ -493,6 +663,110 @@ class MainWindow(QMainWindow):
         dialog = CodeExportDialog(code, self)
         dialog.exec()
 
+    def _on_batch_process(self) -> None:
+        dialog = BatchDialog(self._pipeline.execute, parent=self)
+        dialog.exec()
+
+    def _on_open_dataset(self) -> None:
+        """Switch to the in-window Dataset tab. If no folder has been picked
+        yet, prompt for one immediately so the user lands somewhere
+        actionable instead of an empty grid."""
+        self._tabs.setCurrentIndex(self._dataset_tab_index)
+        if not self._dataset_page.has_folder():
+            self._dataset_page.prompt_for_folder()
+
+    def _on_dataset_image_chosen(self, path: str) -> None:
+        """User clicked a thumbnail — load that file as the new source and
+        snap the tab back to the editor so they can immediately tune the
+        pipeline and Save Image."""
+        image = read_image(path)
+        if image is None:
+            QMessageBox.warning(self, "Open failed", f"Could not read image: {path}")
+            return
+        self._stop_capture_if_active()
+        self._source_image = image
+        self._refresh_preview_source(path_for_status=path)
+        self._dataset_page.mark_active(path)
+        self._tabs.setCurrentIndex(self._editor_tab_index)
+
+    def _on_show_help(self) -> None:
+        """Open (or focus) the non-modal Operation Guide window."""
+        from cvsandbox.core.pipeline import SOURCE_SPEC
+        from cvsandbox.operations import all_builtin_specs
+
+        if self._help_dialog is None:
+            specs = (SOURCE_SPEC, *all_builtin_specs())
+            self._help_dialog = HelpDialog(specs, parent=self)
+        self._help_dialog.show()
+        self._help_dialog.raise_()
+        self._help_dialog.activateWindow()
+
+    def _on_save_image(self) -> None:
+        """Run the pipeline on the FULL-resolution source and write the result
+        to disk. Bypasses the downscaled preview path so the saved file keeps
+        whatever the user actually loaded."""
+        if self._source_image is None:
+            QMessageBox.information(
+                self, "No image", "Load an image, camera, or video first."
+            )
+            return
+        path, _filter = QFileDialog.getSaveFileName(
+            self,
+            "Save processed image",
+            str(Path.home() / "processed.png"),
+            "Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff *.webp)",
+        )
+        if not path:
+            return
+        try:
+            result = self._pipeline.execute(self._source_image)
+            if not cv2.imwrite(path, result):
+                raise OSError(f"cv2.imwrite returned False for {path}")
+        except (OSError, ValueError, TypeError) as exc:
+            QMessageBox.warning(self, "Save failed", str(exc))
+            return
+        self.statusBar().showMessage(f"Saved processed image to {path}")
+
+    def _on_record_video(self) -> None:
+        if not self._video_controller.is_active():
+            QMessageBox.information(
+                self,
+                "No capture",
+                "Open a camera or video first, then start recording.",
+            )
+            return
+        if self._recorder is not None:
+            return  # already recording
+        path, _filter = QFileDialog.getSaveFileName(
+            self,
+            "Record processed video",
+            str(Path.home() / "recording.mp4"),
+            "Videos (*.mp4 *.avi)",
+        )
+        if not path:
+            return
+        source = self._video_controller.current_source()
+        fps = source.fps() if source else 0.0
+        if fps <= 0:
+            fps = 30.0
+        fourcc = "mp4v" if path.lower().endswith(".mp4") else "MJPG"
+        try:
+            self._recorder = VideoRecorder(path, fps=fps, fourcc=fourcc)
+        except OSError as exc:
+            QMessageBox.warning(self, "Record failed", str(exc))
+            return
+        self._stop_recording_action.setEnabled(True)
+        self._record_action.setEnabled(False)
+        self.statusBar().showMessage(f"Recording to {path}")
+
+    def _on_stop_recording(self) -> None:
+        if self._recorder is not None:
+            self._recorder.close()
+            self._recorder = None
+        self._stop_recording_action.setEnabled(False)
+        self._record_action.setEnabled(True)
+        self.statusBar().showMessage("Recording stopped")
+
     def _on_operation_chosen(self, spec_id: str) -> None:
         spec = get_operation(spec_id)
         node = self._pipeline.add(spec)
@@ -538,6 +812,15 @@ class MainWindow(QMainWindow):
         self._image_view.set_image(image)
         self._histogram_panel.set_image(image)
         self._apply_timings(timings)
+        if self._recorder is not None and self._video_controller.is_active():
+            try:
+                self._recorder.write(image)
+            except (OSError, ValueError, TypeError) as exc:
+                QMessageBox.warning(self, "Recording error", str(exc))
+                self._on_stop_recording()
+        if self._video_controller.is_active():
+            # Worker is free again — let the controller pull the next frame.
+            self._video_controller.mark_processed()
 
     def _apply_timings(self, timings: object) -> None:
         """Map an enabled-only timings tuple back to per-pipeline-node timings."""
@@ -558,6 +841,10 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Pipeline error: {message}")
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 (Qt override)
+        if self._recorder is not None:
+            self._recorder.close()
+            self._recorder = None
+        self._stop_capture_if_active()
         self._worker_thread.quit()
         self._worker_thread.wait(2000)
         super().closeEvent(event)

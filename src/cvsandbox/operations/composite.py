@@ -25,10 +25,16 @@ def _blend(a: np.ndarray, b: np.ndarray, alpha: float) -> np.ndarray:
     return cv2.addWeighted(a, 1.0 - float(alpha), b_matched, float(alpha), 0.0)
 
 
-def _blend_code(params: dict[str, Any]) -> list[str]:
+def _blend_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    a, b = input_vars
     alpha = float(params["alpha"])
     return [
-        f"img = cv2.addWeighted(img, {1.0 - alpha}, img, {alpha}, 0.0)",
+        f"_b = _coerce_to_match({b}, {a})",
+        f"if _b.shape != {a}.shape:",
+        f"    _b = cv2.resize(_b, ({a}.shape[1], {a}.shape[0]), interpolation=cv2.INTER_LINEAR)",
+        f"{output_var} = cv2.addWeighted({a}, {1.0 - alpha}, _b, {alpha}, 0.0)",
     ]
 
 
@@ -41,10 +47,19 @@ def _apply_mask(image: np.ndarray, mask: np.ndarray) -> np.ndarray:
     return cv2.bitwise_and(image, image, mask=binary)
 
 
-def _apply_mask_code(_params: dict[str, Any]) -> list[str]:
+def _apply_mask_code(
+    _params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    image, mask = input_vars
     return [
-        "img = cv2.bitwise_and(img, img, mask=(img.any(axis=-1) * 255).astype('uint8') "
-        "if img.ndim == 3 else (img > 0).astype('uint8') * 255)",
+        f"_mask_in = {mask}",
+        "if _mask_in.ndim == 3:",
+        "    _mask_in = cv2.cvtColor(_mask_in, cv2.COLOR_BGR2GRAY)",
+        f"if _mask_in.shape != {image}.shape[:2]:",
+        f"    _mask_in = cv2.resize(_mask_in, ({image}.shape[1], {image}.shape[0]), "
+        f"interpolation=cv2.INTER_NEAREST)",
+        "_binary = (_mask_in > 0).astype('uint8') * 255",
+        f"{output_var} = cv2.bitwise_and({image}, {image}, mask=_binary)",
     ]
 
 
@@ -55,8 +70,16 @@ def _difference(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return cv2.absdiff(a, b_matched)
 
 
-def _difference_code(_params: dict[str, Any]) -> list[str]:
-    return ["img = cv2.absdiff(img, img)"]
+def _difference_code(
+    _params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    a, b = input_vars
+    return [
+        f"_b = _coerce_to_match({b}, {a})",
+        f"if _b.shape != {a}.shape:",
+        f"    _b = cv2.resize(_b, ({a}.shape[1], {a}.shape[0]), interpolation=cv2.INTER_LINEAR)",
+        f"{output_var} = cv2.absdiff({a}, _b)",
+    ]
 
 
 BLEND = OperationSpec(

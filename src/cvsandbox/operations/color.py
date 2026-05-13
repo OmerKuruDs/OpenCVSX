@@ -18,22 +18,37 @@ import numpy as np
 from cvsandbox.core.operation import OperationSpec, Parameter
 
 
-def _to_grayscale_code(_params: dict[str, Any]) -> list[str]:
-    return ["img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img"]
+def _to_grayscale_code(
+    _params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    return [
+        f"{output_var} = cv2.cvtColor({a}, cv2.COLOR_BGR2GRAY) "
+        f"if {a}.ndim == 3 else {a}"
+    ]
 
 
-def _to_hsv_code(_params: dict[str, Any]) -> list[str]:
-    return ["img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)"]
+def _to_hsv_code(
+    _params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    return [f"{output_var} = cv2.cvtColor({a}, cv2.COLOR_BGR2HSV)"]
 
 
-def _invert_code(_params: dict[str, Any]) -> list[str]:
-    return ["img = cv2.bitwise_not(img)"]
+def _invert_code(
+    _params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    return [f"{output_var} = cv2.bitwise_not({a})"]
 
 
-def _channel_code(params: dict[str, Any]) -> list[str]:
+def _channel_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     idx = int(params["channel"])
     return [
-        f"img = img if img.ndim == 2 else img[:, :, {idx} % img.shape[2]]",
+        f"{output_var} = {a} if {a}.ndim == 2 else {a}[:, :, {idx} % {a}.shape[2]]",
     ]
 
 
@@ -123,17 +138,20 @@ def _clahe(image: np.ndarray, clip_limit: float, tile_grid: int) -> np.ndarray:
     return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
 
-def _clahe_code(params: dict[str, Any]) -> list[str]:
+def _clahe_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     clip = float(params["clip_limit"])
     grid = max(1, int(params["tile_grid"]))
     return [
         f"_clahe = cv2.createCLAHE(clipLimit={clip}, tileGridSize=({grid}, {grid}))",
-        "if img.ndim == 2:",
-        "    img = _clahe.apply(img)",
+        f"if {a}.ndim == 2:",
+        f"    {output_var} = _clahe.apply({a})",
         "else:",
-        "    _lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)",
+        f"    _lab = cv2.cvtColor({a}, cv2.COLOR_BGR2LAB)",
         "    _lab[:, :, 0] = _clahe.apply(_lab[:, :, 0])",
-        "    img = cv2.cvtColor(_lab, cv2.COLOR_LAB2BGR)",
+        f"    {output_var} = cv2.cvtColor(_lab, cv2.COLOR_LAB2BGR)",
     ]
 
 
@@ -154,14 +172,17 @@ def _hsv_in_range(
     return cv2.inRange(hsv, lower, upper)
 
 
-def _hsv_in_range_code(params: dict[str, Any]) -> list[str]:
+def _hsv_in_range_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     return [
-        "_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)",
+        f"_hsv = cv2.cvtColor({a}, cv2.COLOR_BGR2HSV)",
         f"_lower = np.array([{int(params['h_min'])}, {int(params['s_min'])}, "
         f"{int(params['v_min'])}], dtype=np.uint8)",
         f"_upper = np.array([{int(params['h_max'])}, {int(params['s_max'])}, "
         f"{int(params['v_max'])}], dtype=np.uint8)",
-        "img = cv2.inRange(_hsv, _lower, _upper)",
+        f"{output_var} = cv2.inRange(_hsv, _lower, _upper)",
     ]
 
 

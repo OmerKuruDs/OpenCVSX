@@ -35,25 +35,36 @@ _FLIP_CODES = {
 }
 
 
-def _resize_code(params: dict[str, Any]) -> list[str]:
+def _resize_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     fx = max(0.01, float(params["scale_x"]))
     fy = max(0.01, float(params["scale_y"]))
     interp = _INTERPOLATION_CONSTS[params["interpolation"]]
-    return [f"img = cv2.resize(img, None, fx={fx}, fy={fy}, interpolation={interp})"]
-
-
-def _rotate_code(params: dict[str, Any]) -> list[str]:
-    angle = float(params["angle"])
     return [
-        "_h, _w = img.shape[:2]",
-        f"_matrix = cv2.getRotationMatrix2D((_w / 2.0, _h / 2.0), {angle}, 1.0)",
-        "img = cv2.warpAffine(img, _matrix, (_w, _h))",
+        f"{output_var} = cv2.resize({a}, None, fx={fx}, fy={fy}, interpolation={interp})"
     ]
 
 
-def _flip_code(params: dict[str, Any]) -> list[str]:
+def _rotate_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    angle = float(params["angle"])
+    return [
+        f"_h, _w = {a}.shape[:2]",
+        f"_matrix = cv2.getRotationMatrix2D((_w / 2.0, _h / 2.0), {angle}, 1.0)",
+        f"{output_var} = cv2.warpAffine({a}, _matrix, (_w, _h))",
+    ]
+
+
+def _flip_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
     code = _FLIP_CODES[params["mode"]]
-    return [f"img = cv2.flip(img, {code})"]
+    return [f"{output_var} = cv2.flip({a}, {code})"]
 
 
 def _resize(image: np.ndarray, scale_x: float, scale_y: float, interpolation: str) -> np.ndarray:
