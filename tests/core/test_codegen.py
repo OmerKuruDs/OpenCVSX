@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+import ast
+
+import numpy as np
+import pytest
+
+from cvsandbox.core.codegen import generate_python_code
+from cvsandbox.core.operation import OperationSpec
+from cvsandbox.core.pipeline import Pipeline
+from cvsandbox.operations import all_builtin_specs, load_builtin_operations
+
+
+def _no_export() -> OperationSpec:
+    return OperationSpec(
+        id="test.no_export",
+        name="No Export",
+        category="Test",
+        description="",
+        parameters=(),
+        func=lambda image: image,
+    )
+
+
+def test_empty_pipeline_emits_pass_body() -> None:
+    code = generate_python_code(Pipeline())
+    assert "def process(img: np.ndarray) -> np.ndarray:" in code
+    assert "pass" in code
+    assert code.rstrip().endswith("return img")
+
+
+def test_generated_code_always_parses_as_valid_python() -> None:
+    load_builtin_operations()
+    pipe = Pipeline()
+    for spec in all_builtin_specs():
+        pipe.add(spec)  # use defaults
+    code = generate_python_code(pipe)
+    ast.parse(code)  # raises on invalid syntax
+
+
+def test_disabled_nodes_are_skipped_in_output() -> None:
+    load_builtin_operations()
+    pipe = Pipeline()
+    pipe.add(_spec("filtering.gaussian_blur"))
+    disabled = pipe.add(_spec("filtering.median_blur"))
+    disabled.enabled = False
+    code = generate_python_code(pipe)
+    assert "GaussianBlur" in code
+    assert "medianBlur" not in code
+
+
+def test_gaussian_blur_bakes_odd_kernel() -> None:
+    load_builtin_operations()
+    pipe = Pipeline()
+    pipe.add(_spec("filtering.gaussian_blur"), {"ksize": 4, "sigma_x": 2.5})
+    code = generate_python_code(pipe)
+    assert "cv2.GaussianBlur(img, (5, 5), 2.5)" in code
+
+
+def test_node_index_and_name_appear_as_comment() -> None:
+    load_builtin_operations()
+    pipe = Pipeline()
+    pipe.add(_spec("filtering.gaussian_blur"))
+    code = generate_python_code(pipe)
+    assert "# [0] Gaussian Blur" in code
+
+
+def test_op_without_code_export_raises() -> None:
+    pipe = Pipeline()
+    pipe.add(_no_export())
+    with pytest.raises(ValueError, match="does not support code export"):
+        generate_python_code(pipe)
+
+
+def test_generated_canny_pipeline_matches_runtime() -> None:
+    """The exported code should be functionally equivalent to the live pipeline."""
+    load_builtin_operations()
+    pipe = Pipeline()
+    pipe.add(_spec("filtering.gaussian_blur"), {"ksize": 5, "sigma_x": 1.0})
+    pipe.add(_spec("edge.canny"), {"threshold1": 50, "threshold2": 150, "aperture_size": 3})
+
+    rng = np.random.default_rng(0)
+    img = rng.integers(0, 256, size=(50, 50, 3), dtype=np.uint8)
+
+    live = pipe.execute(img)
+
+    code = generate_python_code(pipe)
+    namespace: dict[str, object] = {}
+    exec(compile(code, "<generated>", "exec"), namespace)
+    process = namespace["process"]
+    generated = process(img.copy())  # type: ignore[operator]
+
+    assert isinstance(generated, np.ndarray)
+    assert np.array_equal(live, generated)
+
+
+def _spec(spec_id: str) -> OperationSpec:
+    from cvsandbox.core.registry import get_operation
+
+    return get_operation(spec_id)

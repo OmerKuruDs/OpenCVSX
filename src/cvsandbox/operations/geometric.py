@@ -7,6 +7,8 @@ clipped (the canvas stays at the original size).
 
 from __future__ import annotations
 
+from typing import Any
+
 import cv2
 import numpy as np
 
@@ -19,11 +21,39 @@ _INTERPOLATIONS = {
     "Area": cv2.INTER_AREA,
 }
 
+_INTERPOLATION_CONSTS = {
+    "Nearest": "cv2.INTER_NEAREST",
+    "Linear": "cv2.INTER_LINEAR",
+    "Cubic": "cv2.INTER_CUBIC",
+    "Area": "cv2.INTER_AREA",
+}
+
 _FLIP_CODES = {
     "Horizontal": 1,
     "Vertical": 0,
     "Both": -1,
 }
+
+
+def _resize_code(params: dict[str, Any]) -> list[str]:
+    fx = max(0.01, float(params["scale_x"]))
+    fy = max(0.01, float(params["scale_y"]))
+    interp = _INTERPOLATION_CONSTS[params["interpolation"]]
+    return [f"img = cv2.resize(img, None, fx={fx}, fy={fy}, interpolation={interp})"]
+
+
+def _rotate_code(params: dict[str, Any]) -> list[str]:
+    angle = float(params["angle"])
+    return [
+        "_h, _w = img.shape[:2]",
+        f"_matrix = cv2.getRotationMatrix2D((_w / 2.0, _h / 2.0), {angle}, 1.0)",
+        "img = cv2.warpAffine(img, _matrix, (_w, _h))",
+    ]
+
+
+def _flip_code(params: dict[str, Any]) -> list[str]:
+    code = _FLIP_CODES[params["mode"]]
+    return [f"img = cv2.flip(img, {code})"]
 
 
 def _resize(image: np.ndarray, scale_x: float, scale_y: float, interpolation: str) -> np.ndarray:
@@ -76,6 +106,7 @@ RESIZE = OperationSpec(
         ),
     ),
     func=_resize,
+    code_export=_resize_code,
 )
 
 
@@ -96,6 +127,7 @@ ROTATE = OperationSpec(
         ),
     ),
     func=_rotate,
+    code_export=_rotate_code,
 )
 
 
@@ -114,6 +146,7 @@ FLIP = OperationSpec(
         ),
     ),
     func=_flip,
+    code_export=_flip_code,
 )
 
 

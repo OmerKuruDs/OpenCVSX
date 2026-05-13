@@ -7,6 +7,8 @@ applied.
 
 from __future__ import annotations
 
+from typing import Any
+
 import cv2
 import numpy as np
 
@@ -17,6 +19,50 @@ _SHAPES = {
     "Ellipse": cv2.MORPH_ELLIPSE,
     "Cross": cv2.MORPH_CROSS,
 }
+
+_SHAPE_CONSTS = {
+    "Rectangle": "cv2.MORPH_RECT",
+    "Ellipse": "cv2.MORPH_ELLIPSE",
+    "Cross": "cv2.MORPH_CROSS",
+}
+
+
+def _kernel_line(params: dict[str, Any]) -> str:
+    k = max(1, int(params["ksize"]) | 1)
+    return (
+        f"kernel = cv2.getStructuringElement("
+        f"{_SHAPE_CONSTS[params['shape']]}, ({k}, {k}))"
+    )
+
+
+def _erode_code(params: dict[str, Any]) -> list[str]:
+    return [
+        _kernel_line(params),
+        f"img = cv2.erode(img, kernel, iterations={int(params['iterations'])})",
+    ]
+
+
+def _dilate_code(params: dict[str, Any]) -> list[str]:
+    return [
+        _kernel_line(params),
+        f"img = cv2.dilate(img, kernel, iterations={int(params['iterations'])})",
+    ]
+
+
+def _morph_ex_code(op_const: str, params: dict[str, Any]) -> list[str]:
+    return [
+        _kernel_line(params),
+        f"img = cv2.morphologyEx(img, {op_const}, kernel, "
+        f"iterations={int(params['iterations'])})",
+    ]
+
+
+def _open_code(params: dict[str, Any]) -> list[str]:
+    return _morph_ex_code("cv2.MORPH_OPEN", params)
+
+
+def _close_code(params: dict[str, Any]) -> list[str]:
+    return _morph_ex_code("cv2.MORPH_CLOSE", params)
 
 
 def _kernel(shape: str, ksize: int) -> np.ndarray:
@@ -80,6 +126,7 @@ ERODE = OperationSpec(
     description="Shrinks bright regions. Good for removing small bright noise.",
     parameters=_shared_params(),
     func=_erode,
+    code_export=_erode_code,
 )
 
 
@@ -90,6 +137,7 @@ DILATE = OperationSpec(
     description="Grows bright regions. Good for joining nearby bright blobs.",
     parameters=_shared_params(),
     func=_dilate,
+    code_export=_dilate_code,
 )
 
 
@@ -100,6 +148,7 @@ OPEN = OperationSpec(
     description="Erode then dilate. Removes small bright objects while preserving large shapes.",
     parameters=_shared_params(),
     func=_open,
+    code_export=_open_code,
 )
 
 
@@ -110,6 +159,7 @@ CLOSE = OperationSpec(
     description="Dilate then erode. Closes small holes in bright regions.",
     parameters=_shared_params(),
     func=_close,
+    code_export=_close_code,
 )
 
 

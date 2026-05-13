@@ -12,9 +12,17 @@ from __future__ import annotations
 
 from cvsandbox.core.operation import OperationSpec
 from cvsandbox.core.registry import register_operation
-from cvsandbox.operations import color, edge, filtering, geometric, morphology, threshold
+from cvsandbox.operations import (
+    analysis,
+    color,
+    edge,
+    filtering,
+    geometric,
+    morphology,
+    threshold,
+)
 
-_BUILTIN_MODULES = (filtering, threshold, morphology, edge, color, geometric)
+_BUILTIN_MODULES = (filtering, threshold, morphology, edge, color, geometric, analysis)
 
 
 def all_builtin_specs() -> tuple[OperationSpec, ...]:

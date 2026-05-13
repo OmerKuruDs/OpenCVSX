@@ -16,6 +16,14 @@ import numpy as np
 ParamKind = Literal["int", "float", "bool", "choice", "kernel_size"]
 
 OperationFunc = Callable[..., np.ndarray]
+CodeExporter = Callable[[dict[str, Any]], list[str]]
+"""Returns the Python source lines that reproduce this op for given params.
+
+Each line operates on a variable named `img` (read and reassigned). The lines
+must be self-contained — no shared helpers beyond `cv2` and `np`. The exporter
+is responsible for baking literal values (post-clamping, post-odd-forcing) so
+the generated code mirrors what `func` would do at runtime.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +62,7 @@ class OperationSpec:
     description: str
     parameters: tuple[Parameter, ...]
     func: OperationFunc
+    code_export: CodeExporter | None = None
 
     def __post_init__(self) -> None:
         if not self.id or "." not in self.id:

@@ -8,16 +8,50 @@ Laplacian produce signed/float arrays that we collapse back to uint8 via
 
 from __future__ import annotations
 
+from typing import Any
+
 import cv2
 import numpy as np
 
 from cvsandbox.core.operation import OperationSpec, Parameter
+
+_TO_GRAY_LINE = "img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img"
 
 
 def _to_gray(image: np.ndarray) -> np.ndarray:
     if image.ndim == 3:
         return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     return image
+
+
+def _canny_code(params: dict[str, Any]) -> list[str]:
+    aperture = max(3, min(7, int(params["aperture_size"]) | 1))
+    return [
+        _TO_GRAY_LINE,
+        f"img = cv2.Canny(img, {float(params['threshold1'])}, "
+        f"{float(params['threshold2'])}, apertureSize={aperture})",
+    ]
+
+
+def _sobel_code(params: dict[str, Any]) -> list[str]:
+    dx = int(params["dx"])
+    dy = int(params["dy"])
+    if dx == 0 and dy == 0:
+        # Match the runtime fallback: just grayscale.
+        return [_TO_GRAY_LINE]
+    k = max(1, min(7, int(params["ksize"]) | 1))
+    return [
+        _TO_GRAY_LINE,
+        f"img = cv2.convertScaleAbs(cv2.Sobel(img, cv2.CV_64F, {dx}, {dy}, ksize={k}))",
+    ]
+
+
+def _laplacian_code(params: dict[str, Any]) -> list[str]:
+    k = max(1, min(31, int(params["ksize"]) | 1))
+    return [
+        _TO_GRAY_LINE,
+        f"img = cv2.convertScaleAbs(cv2.Laplacian(img, cv2.CV_64F, ksize={k}))",
+    ]
 
 
 def _canny(image: np.ndarray, threshold1: int, threshold2: int, aperture_size: int) -> np.ndarray:
@@ -63,6 +97,7 @@ CANNY = OperationSpec(
         ),
     ),
     func=_canny,
+    code_export=_canny_code,
 )
 
 
@@ -85,6 +120,7 @@ SOBEL = OperationSpec(
         ),
     ),
     func=_sobel,
+    code_export=_sobel_code,
 )
 
 
@@ -105,6 +141,7 @@ LAPLACIAN = OperationSpec(
         ),
     ),
     func=_laplacian,
+    code_export=_laplacian_code,
 )
 
 

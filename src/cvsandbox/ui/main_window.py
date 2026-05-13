@@ -35,10 +35,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from cvsandbox.core.codegen import generate_python_code
 from cvsandbox.core.pipeline import Pipeline
 from cvsandbox.core.registry import get_operation
 from cvsandbox.core.serialization import load as load_pipeline
 from cvsandbox.core.serialization import save as save_pipeline
+from cvsandbox.ui.code_export_dialog import CodeExportDialog
 from cvsandbox.ui.image_view import ImageViewWidget
 from cvsandbox.ui.operation_catalog import OperationCatalog
 from cvsandbox.ui.parameter_panel import ParameterPanel
@@ -114,6 +116,13 @@ class MainWindow(QMainWindow):
         save_pipeline_action.setShortcut(QKeySequence.StandardKey.SaveAs)
         save_pipeline_action.triggered.connect(self._on_save_pipeline)
         file_menu.addAction(save_pipeline_action)
+
+        file_menu.addSeparator()
+
+        export_code_action = QAction("&Export Code…", self)
+        export_code_action.setShortcut("Ctrl+E")
+        export_code_action.triggered.connect(self._on_export_code)
+        file_menu.addAction(export_code_action)
 
         file_menu.addSeparator()
 
@@ -203,6 +212,15 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Save failed", f"Could not save pipeline: {exc}")
             return
         self.statusBar().showMessage(f"Saved pipeline to {path}")
+
+    def _on_export_code(self) -> None:
+        try:
+            code = generate_python_code(self._pipeline)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Export failed", str(exc))
+            return
+        dialog = CodeExportDialog(code, self)
+        dialog.exec()
 
     def _on_operation_chosen(self, spec_id: str) -> None:
         spec = get_operation(spec_id)

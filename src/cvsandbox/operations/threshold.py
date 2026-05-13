@@ -7,10 +7,14 @@ need 3 channels should add a grayscale-to-BGR conversion after.
 
 from __future__ import annotations
 
+from typing import Any
+
 import cv2
 import numpy as np
 
 from cvsandbox.core.operation import OperationSpec, Parameter
+
+_TO_GRAY_LINE = "img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img"
 
 
 def _to_gray(image: np.ndarray) -> np.ndarray:
@@ -37,6 +41,41 @@ _ADAPTIVE_METHODS = {
     "Mean": cv2.ADAPTIVE_THRESH_MEAN_C,
     "Gaussian": cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
 }
+
+
+def _binary_code(params: dict[str, Any]) -> list[str]:
+    mode = "cv2.THRESH_BINARY_INV" if params["inverse"] else "cv2.THRESH_BINARY"
+    return [
+        _TO_GRAY_LINE,
+        f"_, img = cv2.threshold(img, {float(params['thresh'])}, "
+        f"{float(params['maxval'])}, {mode})",
+    ]
+
+
+def _otsu_code(params: dict[str, Any]) -> list[str]:
+    base = "cv2.THRESH_BINARY_INV" if params["inverse"] else "cv2.THRESH_BINARY"
+    return [
+        _TO_GRAY_LINE,
+        f"_, img = cv2.threshold(img, 0, {float(params['maxval'])}, "
+        f"{base} | cv2.THRESH_OTSU)",
+    ]
+
+
+_ADAPTIVE_CODE_CONSTS = {
+    "Mean": "cv2.ADAPTIVE_THRESH_MEAN_C",
+    "Gaussian": "cv2.ADAPTIVE_THRESH_GAUSSIAN_C",
+}
+
+
+def _adaptive_code(params: dict[str, Any]) -> list[str]:
+    method_const = _ADAPTIVE_CODE_CONSTS[params["method"]]
+    block = max(3, int(params["block_size"]) | 1)
+    mode = "cv2.THRESH_BINARY_INV" if params["inverse"] else "cv2.THRESH_BINARY"
+    return [
+        _TO_GRAY_LINE,
+        f"img = cv2.adaptiveThreshold(img, {float(params['maxval'])}, "
+        f"{method_const}, {mode}, {block}, {float(params['c'])})",
+    ]
 
 
 def _adaptive_threshold(
@@ -71,6 +110,7 @@ BINARY_THRESHOLD = OperationSpec(
         Parameter(name="inverse", kind="bool", default=False, label="Invert"),
     ),
     func=_binary_threshold,
+    code_export=_binary_code,
 )
 
 
@@ -84,6 +124,7 @@ OTSU_THRESHOLD = OperationSpec(
         Parameter(name="inverse", kind="bool", default=False, label="Invert"),
     ),
     func=_otsu_threshold,
+    code_export=_otsu_code,
 )
 
 
@@ -123,6 +164,7 @@ ADAPTIVE_THRESHOLD = OperationSpec(
         Parameter(name="inverse", kind="bool", default=False, label="Invert"),
     ),
     func=_adaptive_threshold,
+    code_export=_adaptive_code,
 )
 
 
