@@ -881,6 +881,566 @@ port.</p>
       Blur output on b)</b> isolates the high-frequency detail.</li>
 </ul>
 """,
+    # ---------------------------------------------------------------- Features
+    "features.harris": """
+<h2>Harris Corners</h2>
+<p><i>features.harris · category: Features</i></p>
+<p>Computes the Harris corner response — a per-pixel score that peaks at
+locations where the image varies in multiple directions (i.e. corners, not
+edges or flat regions). The output draws every pixel whose response exceeds
+<code>threshold × peak</code> in red on top of a BGR copy of the input.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Block size</b> — neighbourhood used to build the structure tensor.
+      Small (2-3) for crisp corners, larger to absorb noise.</li>
+  <li><b>Sobel aperture</b> — odd 3-7. Bigger derivative kernel = smoother
+      gradients but worse localisation.</li>
+  <li><b>Harris k</b> — the free parameter in <code>det(M) - k·trace(M)²</code>.
+      0.04-0.06 is standard.</li>
+  <li><b>Threshold (×peak)</b> — fraction of the strongest response that
+      counts as a corner. Lower = more (and noisier) corners.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Calibration patterns (checkerboards) where corners are unambiguous.</li>
+  <li>A diagnostic overlay to see which areas of a frame are textured
+      enough for tracking.</li>
+</ul>
+""",
+    "features.shi_tomasi": """
+<h2>Shi-Tomasi Corners</h2>
+<p><i>features.shi_tomasi · category: Features</i></p>
+<p>Picks the <i>N</i> highest-quality corners under the Shi-Tomasi criterion
+(<code>min(λ₁, λ₂)</code> of the structure tensor) and draws each as a green
+circle. Generally produces better tracking points than raw Harris.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Max corners</b> — hard cap on the number returned.</li>
+  <li><b>Quality level</b> — fraction of the best corner's score; anything
+      below is rejected.</li>
+  <li><b>Min distance</b> — minimum pixel spacing between kept corners.</li>
+  <li><b>Block size</b> — covariance-window size; same role as in Harris.</li>
+  <li><b>Marker radius</b> — visual only.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Picking seed points for optical-flow / KLT tracking.</li>
+  <li>Pre-visualising "trackable" areas before running a longer pipeline.</li>
+</ul>
+""",
+    "features.fast": """
+<h2>FAST Keypoints</h2>
+<p><i>features.fast · category: Features</i></p>
+<p>FAST (Features from Accelerated Segment Test) tests a small ring of
+pixels around each candidate and accepts it as a corner if a contiguous arc
+is uniformly brighter or darker than the centre. Extremely cheap to compute
+and rotation-invariant, but produces no descriptors — pair with BRIEF or
+ORB if you need matching.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Threshold</b> — intensity difference required for the arc to count.
+      Lower = more keypoints (and more clutter).</li>
+  <li><b>Non-max suppression</b> — collapses clusters of neighbouring
+      keypoints to the single strongest one. Keep on for clean results.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Real-time pipelines where compute budget is tight.</li>
+  <li>SLAM / visual odometry pre-processing.</li>
+</ul>
+""",
+    "features.orb": """
+<h2>ORB Keypoints</h2>
+<p><i>features.orb · category: Features</i></p>
+<p>Oriented FAST + Rotated BRIEF — a patent-free alternative to SIFT/SURF.
+Detects scale- and rotation-invariant keypoints by running FAST at multiple
+pyramid levels. Toggle <b>Draw rich keypoints</b> to render each keypoint's
+size and orientation as a circle with a radial line.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Max features</b> — upper bound on retained keypoints.</li>
+  <li><b>Scale factor</b> — pyramid step ratio. 1.2 is the OpenCV default;
+      smaller keeps more levels.</li>
+  <li><b>Pyramid levels</b> — how many octaves are searched.</li>
+  <li><b>Draw rich keypoints</b> — visual; show keypoint scale/orientation.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Image stitching / panorama pipelines.</li>
+  <li>Object recognition where SIFT's licence is a problem.</li>
+</ul>
+""",
+    "features.hough_lines": """
+<h2>Hough Lines</h2>
+<p><i>features.hough_lines · category: Features</i></p>
+<p>Probabilistic Hough line transform. Internally runs Canny to obtain an
+edge map, then accumulates straight-line votes and emits the detected
+segments. The output draws each segment in green on a BGR copy of the
+input.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Canny low / high</b> — thresholds for the internal edge detector.
+      If you already have an edge map upstream, set these wide (e.g. 1 /
+      255) so Canny passes everything through.</li>
+  <li><b>Accumulator threshold</b> — minimum vote count for a line.</li>
+  <li><b>Min line length</b> — discards short segments.</li>
+  <li><b>Max line gap</b> — bridges small gaps when joining segments.</li>
+  <li><b>Line thickness</b> — visual only.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Lane detection in road footage.</li>
+  <li>Finding document borders / scan deskew.</li>
+  <li>Detecting horizon, grid lines, ruler markings.</li>
+</ul>
+""",
+    "features.hough_circles": """
+<h2>Hough Circles</h2>
+<p><i>features.hough_circles · category: Features</i></p>
+<p>Detects circles using the Hough gradient method. The image is internally
+smoothed, gradient-thresholded, and voted into a (centre-x, centre-y, radius)
+accumulator. Detected circles are drawn with green rims and red centre
+dots.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>dp</b> — inverse ratio of accumulator resolution to image
+      resolution. 1.0 = full res (slow, accurate); 2.0 = half res (fast).</li>
+  <li><b>Min center distance</b> — minimum spacing between detected
+      centres. Too small → duplicate detections.</li>
+  <li><b>Canny high threshold</b> — upper Canny threshold used internally.</li>
+  <li><b>Accumulator threshold</b> — votes needed to confirm a circle.
+      Lower = more false positives.</li>
+  <li><b>Min/Max radius</b> — search range. Setting both to 0 lets OpenCV
+      pick, but constraining the range is far more reliable.</li>
+  <li><b>Line thickness</b> — visual only.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Coin / bottle-cap counting on conveyor lines.</li>
+  <li>Eye / iris detection.</li>
+  <li>Finding round logos or buttons in screenshots.</li>
+</ul>
+""",
+    # -------------------------------------------------- Filtering (advanced)
+    "filtering.unsharp_mask": """
+<h2>Unsharp Mask</h2>
+<p><i>filtering.unsharp_mask · category: Filtering</i></p>
+<p>The classic photographic sharpening technique: blur a copy of the image,
+subtract it from the original to isolate the high-frequency detail, then add
+that detail back scaled by <i>amount</i>. <i>Threshold</i> protects flat
+regions from getting noisier.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Blur radius</b> — odd kernel size for the internal Gaussian copy.
+      Smaller = sharper but less halo control.</li>
+  <li><b>Amount</b> — strength multiplier. 1.0 = standard, 2-3 = aggressive.</li>
+  <li><b>Threshold</b> — only sharpen pixels whose detail magnitude exceeds
+      this. 0 sharpens everything (and amplifies noise).</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Recovering perceived sharpness after a denoise or downscale step.</li>
+  <li>Compensating for soft lenses or focus.</li>
+  <li>Reverse application: low Amount + Gaussian Blur upstream = "frequency
+      separation" workflow.</li>
+</ul>
+""",
+    "filtering.custom_kernel": """
+<h2>Custom Kernel</h2>
+<p><i>filtering.custom_kernel · category: Filtering</i></p>
+<p>Convolves the image with a 3×3 kernel chosen from a preset list. Each
+preset captures a classic effect; <i>strength</i> scales the whole kernel so
+the same preset can be subtle or extreme.</p>
+<h3>Presets</h3>
+<ul>
+  <li><b>Identity</b> — pass-through. Verify wiring.</li>
+  <li><b>Sharpen / Strong Sharpen</b> — emphasise differences from the
+      neighbourhood.</li>
+  <li><b>Edge Enhance</b> — Laplacian-style outline.</li>
+  <li><b>Emboss</b> — directional shading, gives a 3D-relief look.</li>
+  <li><b>Outline</b> — high-contrast edges over a darkened background.</li>
+  <li><b>Box Blur 3×3</b> — uniform average; the simplest smoothing.</li>
+</ul>
+<p><b>Strength</b> linearly scales the kernel — 0 produces a black image,
+1 is the preset's nominal effect, 2-3 over-drives it.</p>
+""",
+    # ----------------------------------------------------------------- Edge
+    "edge.scharr": """
+<h2>Scharr</h2>
+<p><i>edge.scharr · category: Edge</i></p>
+<p>A 3×3 derivative operator very similar to Sobel, but using kernel weights
+that better approximate the gradient at small kernel sizes. Prefer Scharr
+over <b>Sobel</b> when you have to use a 3×3 kernel and accuracy of the
+gradient direction matters.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>dx / dy</b> — 0 or 1 each. Exactly one of them must be 1 for a
+      single direction. If both are 1 the op falls back to |Gx| + |Gy|
+      (gradient magnitude). Both 0 returns the grayscale input untouched.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Optical flow / structure-from-motion pre-processing.</li>
+  <li>Anywhere Sobel's accuracy at ksize=3 is borderline.</li>
+</ul>
+""",
+    # ------------------------------------------------------------ Frequency
+    "freq.fft_magnitude": """
+<h2>FFT Magnitude</h2>
+<p><i>freq.fft_magnitude · category: Frequency</i></p>
+<p>The Discrete Fourier Transform of the image, rendered as a single-channel
+spectrum. Bright spots = strong frequency components at that orientation /
+spatial frequency. Use this to <i>see</i> which frequencies dominate a
+texture or which directions a pattern repeats in.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Log scale</b> — apply <code>log(1 + |F|)</code> so the dynamic
+      range fits in 0-255. Off = nearly all-black with a single DC spike.</li>
+  <li><b>Shift center</b> — bring the DC (zero-frequency) component to the
+      middle. The standard "spectrum" view.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Diagnosing periodic noise (looks like distinct bright dots).</li>
+  <li>Comparing textures.</li>
+  <li>Pairing with a <b>Low-Pass / High-Pass Filter</b> to preview which
+      frequencies will be kept.</li>
+</ul>
+""",
+    "freq.fft_phase": """
+<h2>FFT Phase</h2>
+<p><i>freq.fft_phase · category: Frequency</i></p>
+<p>The phase angle of each DFT coefficient, rescaled to 0-255. Visually
+noisy but it actually carries most of the structural information of the
+image — a famous experiment swaps phases between two photos and the
+output looks like the phase-donor.</p>
+<p><b>Shift center</b> works as in FFT Magnitude.</p>
+""",
+    "freq.low_pass": """
+<h2>Low-Pass Filter</h2>
+<p><i>freq.low_pass · category: Frequency</i></p>
+<p>Suppresses frequency components further than <i>cutoff radius</i> from
+the centre of the spectrum, then inverse-transforms back to an image. The
+result is the slow / smooth content of the original.</p>
+<h3>Filter shapes</h3>
+<ul>
+  <li><b>Ideal</b> — hard cutoff. Sharp but produces ringing in the spatial
+      domain (Gibbs artefacts).</li>
+  <li><b>Gaussian</b> — smooth roll-off. No ringing; most natural for
+      photographic images.</li>
+  <li><b>Butterworth</b> — controllable roll-off via <i>order</i>; higher
+      order behaves more like Ideal, lower like Gaussian.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Comparing against a Gaussian Blur — same effect, different cost
+      profile.</li>
+  <li>Removing periodic noise (combine with Notch filtering when
+      adding more ops).</li>
+</ul>
+""",
+    "freq.high_pass": """
+<h2>High-Pass Filter</h2>
+<p><i>freq.high_pass · category: Frequency</i></p>
+<p>The complement of Low-Pass: keeps only frequencies further than
+<i>cutoff radius</i> from the centre. The output is the fast / detailed
+content of the original — edges, fine texture, noise.</p>
+<p><b>Filter shapes</b> behave identically to Low-Pass.</p>
+<h3>Where it shines</h3>
+<ul>
+  <li>Edge detection in the frequency domain — chain into a threshold.</li>
+  <li>Frequency-separation retouching (split detail from base tones).</li>
+  <li>Removing slow brightness gradients from scanned documents.</li>
+</ul>
+""",
+    "freq.band_pass": """
+<h2>Band-Pass Filter</h2>
+<p><i>freq.band_pass · category: Frequency</i></p>
+<p>Keeps the annular ring of frequencies between <i>inner radius</i> and
+<i>outer radius</i>. Everything slower than inner or faster than outer is
+suppressed.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Inner radius / Outer radius</b> — radii in pixels of the
+      frequency-space ring. If you accidentally set inner ≥ outer the op
+      clamps to a tiny valid band.</li>
+  <li><b>Filter shape / order</b> — same options as Low-Pass.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Isolating texture at a specific scale (e.g. fingerprint ridges).</li>
+  <li>Selectively boosting mid-frequency detail without amplifying noise.</li>
+</ul>
+""",
+    # ----------------------------------------------------- Morphology (advanced)
+    "morphology.gradient": """
+<h2>Gradient</h2>
+<p><i>morphology.gradient · category: Morphology</i></p>
+<p>Dilation minus erosion — produces an outline of bright regions. A cheap,
+robust edge detector for binary or near-binary inputs where Canny would be
+overkill.</p>
+<p>Parameters mirror the basic morphology ops: <b>Kernel shape</b>,
+<b>Kernel size</b>, and <b>Iterations</b>.</p>
+<h3>Where it shines</h3>
+<ul>
+  <li>Drawing outlines of segmented shapes for visualisation.</li>
+  <li>Pre-processing for shape descriptors (perimeter, contour).</li>
+</ul>
+""",
+    "morphology.tophat": """
+<h2>Top-Hat</h2>
+<p><i>morphology.tophat · category: Morphology</i></p>
+<p>Input minus its morphological opening — isolates bright features smaller
+than the structuring element. Subtracting the opening removes everything
+that survives an erode-then-dilate cycle, leaving only the small bright
+specks.</p>
+<h3>Where it shines</h3>
+<ul>
+  <li>Detecting small bright objects on uneven backgrounds (cells under a
+      microscope, defects on a sheet of metal).</li>
+  <li>Correcting non-uniform illumination — subtract a Top-Hat from the
+      original to flatten the background.</li>
+</ul>
+""",
+    "morphology.blackhat": """
+<h2>Black-Hat</h2>
+<p><i>morphology.blackhat · category: Morphology</i></p>
+<p>Closing minus input — mirror of Top-Hat for dark features. Isolates dark
+spots smaller than the structuring element on a brighter background.</p>
+<h3>Where it shines</h3>
+<ul>
+  <li>Reading dark text on uneven backgrounds.</li>
+  <li>Finding cracks / pits on a bright surface.</li>
+</ul>
+""",
+    # ----------------------------------------------------- Threshold (advanced)
+    "threshold.triangle": """
+<h2>Triangle Threshold</h2>
+<p><i>threshold.triangle · category: Threshold</i></p>
+<p>Automatic threshold via the triangle method: the algorithm draws a line
+between the histogram peak and the far end, then picks the threshold at the
+point with the maximum perpendicular distance to that line. Works well on
+images whose histogram has one dominant lobe and a long tail — the case
+where Otsu often picks a poor split.</p>
+<p>Parameters: <b>Max value</b> (the bright output), <b>Invert</b>
+(swap which side becomes bright).</p>
+""",
+    "threshold.in_range": """
+<h2>In-Range (BGR)</h2>
+<p><i>threshold.in_range · category: Threshold</i></p>
+<p>Returns a binary mask where every BGR channel falls inside its
+[low, high] interval. Pixels that match every channel become 255; the rest
+become 0. The op normalises low/high if you accidentally swap them.</p>
+<h3>Where it shines</h3>
+<ul>
+  <li>Quick colour pickers when you already know the BGR bounds.</li>
+  <li>Cleaning up rendered/synthetic images where target colours are exact.</li>
+</ul>
+<p>For chromatic targeting on natural images, prefer the
+<b>HSV In-Range Mask</b> from the Color category — it's hue-based and far
+less sensitive to lighting.</p>
+""",
+    # --------------------------------------------------------- Segmentation
+    "segmentation.distance_transform": """
+<h2>Distance Transform</h2>
+<p><i>segmentation.distance_transform · category: Segmentation</i></p>
+<p>For each foreground pixel, computes the distance to the nearest
+background pixel and normalises the result to 0-255. Enable <b>Color map</b>
+to render with the jet palette — peaks (centres of large blobs) glow red,
+edges fade to blue.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Distance type</b> — L2 (true Euclidean), L1 (city-block), or
+      Chessboard. L2 is the most natural for geometric measurements.</li>
+  <li><b>Mask size</b> — 3 is fast, 5 is more accurate, <i>Precise</i> uses
+      a full Euclidean computation (slowest).</li>
+  <li><b>Color map</b> — jet palette on/off.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Building marker images for <b>Watershed</b>.</li>
+  <li>Finding the medial axis / skeleton of shapes.</li>
+  <li>Quick "object centre" visualisations.</li>
+</ul>
+""",
+    "segmentation.connected_components": """
+<h2>Connected Components</h2>
+<p><i>segmentation.connected_components · category: Segmentation</i></p>
+<p>Labels each connected white blob in the (auto-binarised) input with a
+unique integer, then paints each label in its own colour. Background stays
+black. Use <b>Min area</b> to drop noise specks before colouring.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Connectivity</b> — 4-way only counts axial neighbours; 8-way also
+      counts diagonals.</li>
+  <li><b>Min area</b> — discard labels smaller than this many pixels.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Counting separated objects after a threshold step.</li>
+  <li>Visualising how morphology / threshold tuning changes the blob
+      decomposition.</li>
+</ul>
+""",
+    "segmentation.watershed": """
+<h2>Watershed</h2>
+<p><i>segmentation.watershed · category: Segmentation</i></p>
+<p>Marker-based segmentation. The op runs the full classic recipe for you:
+Otsu threshold → morphological opening → distance transform → connected
+components → watershed. Final output: the original image (converted to BGR)
+with watershed boundaries drawn in red.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Foreground threshold</b> — fraction of the peak distance value
+      treated as <i>sure</i> foreground. Lower picks more area as foreground.</li>
+  <li><b>Background dilation</b> — iterations of the dilate that builds
+      <i>sure</i> background. Higher = wider unknown band.</li>
+  <li><b>Noise kernel</b> — opening kernel size used to clean up specks
+      before computing the distance transform.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Separating touching objects (cells, coins, fruit) that a plain
+      threshold merges into one blob.</li>
+  <li>Producing crisp segmentation boundaries for downstream contour
+      detection.</li>
+</ul>
+""",
+    "segmentation.grabcut": """
+<h2>GrabCut (rect)</h2>
+<p><i>segmentation.grabcut · category: Segmentation</i></p>
+<p>Iterative foreground extraction. Initialises with a centred rectangle —
+<b>Margin</b> controls how much of the border is treated as background —
+then refines the segmentation by alternating Gaussian mixture model
+estimation and graph-cut optimisation. The output keeps foreground pixels
+and blacks out everything else.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Rect margin (%)</b> — fraction of width/height treated as
+      background border at init. 10-20% suits most centred subjects.</li>
+  <li><b>Iterations</b> — refinement passes. More is slower; gains beyond
+      5 are usually marginal.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>One-shot background removal for product photos with the subject
+      roughly centred.</li>
+  <li>Generating training data masks with minimal manual effort.</li>
+</ul>
+""",
+    # --------------------------------------------------------------- Arithmetic
+    "arithmetic.add": """
+<h2>Add</h2>
+<p><i>arithmetic.add · category: Arithmetic · multi-input</i></p>
+<p>Saturated per-pixel sum: <code>out = clip(a + b, 0, 255)</code>. Wire two
+images into <code>a</code> and <code>b</code> — channel layouts and sizes
+are auto-matched (a grayscale <code>b</code> is broadcast across BGR, and
+size mismatches are resized to <code>a</code>'s shape).</p>
+<h3>Where it shines</h3>
+<ul>
+  <li>Combining two soft masks into a brighter union.</li>
+  <li>Boosting brightness uniformly by adding a constant gray plate.</li>
+</ul>
+<p>For weighted blending use <b>Composite → Blend</b> instead.</p>
+""",
+    "arithmetic.subtract": """
+<h2>Subtract</h2>
+<p><i>arithmetic.subtract · category: Arithmetic · multi-input</i></p>
+<p>Saturated per-pixel difference: <code>out = clip(a - b, 0, 255)</code>.
+Unlike <b>Composite → Difference</b>, the order matters and negative
+results are clipped instead of taken absolute. Pair the two ops to compare
+signed and absolute differences side by side.</p>
+<h3>Where it shines</h3>
+<ul>
+  <li>Background subtraction when you have a clean reference plate.</li>
+  <li>Removing a known illumination pattern from a captured frame.</li>
+</ul>
+""",
+    "arithmetic.multiply": """
+<h2>Multiply</h2>
+<p><i>arithmetic.multiply · category: Arithmetic · multi-input</i></p>
+<p>Element-wise product with a scale factor:
+<code>out = clip(a · b · scale, 0, 255)</code>. With a binary mask on
+<code>b</code> and <code>scale = 1/255</code> the op behaves like
+<b>Apply Mask</b> while still respecting <i>soft</i> mask values.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Scale</b> — output scaling. Defaults to <code>1/255</code> so a
+      multiplication by a 0-255 mask stays in range.</li>
+</ul>
+""",
+    "arithmetic.bitwise_and": """
+<h2>Bitwise AND</h2>
+<p><i>arithmetic.bitwise_and · category: Arithmetic · multi-input</i></p>
+<p>Per-pixel bitwise AND. With binary masks this is the intersection — the
+output is bright only where <i>both</i> inputs are. With photographic
+inputs it produces a stylised, posterised look since every channel gets
+ANDed bit-by-bit.</p>
+""",
+    "arithmetic.bitwise_or": """
+<h2>Bitwise OR</h2>
+<p><i>arithmetic.bitwise_or · category: Arithmetic · multi-input</i></p>
+<p>Per-pixel bitwise OR. The mask-union: bright in either input becomes
+bright in the output. Quickest way to combine multiple thresholded
+regions.</p>
+""",
+    "arithmetic.bitwise_xor": """
+<h2>Bitwise XOR</h2>
+<p><i>arithmetic.bitwise_xor · category: Arithmetic · multi-input</i></p>
+<p>Per-pixel bitwise XOR. With binary masks this is the symmetric
+difference — bright where <i>exactly one</i> of the inputs is bright.
+A handy diagnostic when comparing two segmentation attempts: XOR shows
+exactly where they disagree.</p>
+""",
+    # ----------------------------------------------------------------- Stereo
+    "stereo.bm": """
+<h2>Stereo BM (disparity)</h2>
+<p><i>stereo.bm · category: Stereo · multi-input</i></p>
+<p>Classic block-matching disparity. Compares small windows along
+corresponding rows of a rectified <i>left</i> / <i>right</i> stereo pair
+and reports how far each pixel had to shift to find its best match.
+Brighter output = closer object.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Num disparities</b> — the search range. <i>Must be a multiple of
+      16; the op rounds your value down.</i> Wider = finds closer objects
+      but slower.</li>
+  <li><b>Block size</b> — odd, ≥5. Larger windows tolerate noise but blur
+      depth discontinuities.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Quick depth previews from a calibrated stereo rig.</li>
+  <li>Pipelines where speed matters more than smooth depth (robotics
+      obstacle detection).</li>
+</ul>
+<p>For better quality at the cost of speed, use <b>Stereo SGBM</b>.</p>
+""",
+    "stereo.sgbm": """
+<h2>Stereo SGBM (disparity)</h2>
+<p><i>stereo.sgbm · category: Stereo · multi-input</i></p>
+<p>Semi-global block matching: minimises a global smoothness energy along
+many 1-D paths instead of treating each pixel independently. Slower than
+plain BM but produces much cleaner depth maps — the standard choice for
+feeding 3D reconstruction.</p>
+<h3>Parameters</h3>
+<ul>
+  <li><b>Num disparities</b> — multiple of 16, same role as BM.</li>
+  <li><b>Block size</b> — odd, ≥3. SGBM prefers smaller blocks (5-7).</li>
+  <li><b>Min disparity</b> — shift the search range; useful when objects
+      are very close (positive) or behind the calibration plane (negative).</li>
+  <li><b>Uniqueness ratio</b> — % margin the best match must beat its
+      runner-up. Higher = stricter, more "unknown" pixels.</li>
+  <li><b>Speckle window</b> — connected-region size below which
+      disparities are erased as noise. 0 disables.</li>
+</ul>
+<h3>Where it shines</h3>
+<ul>
+  <li>Off-line reconstruction from a calibrated camera pair.</li>
+  <li>Wherever the depth map will be lifted into a 3D point cloud — the
+      smoother input avoids reconstruction noise.</li>
+</ul>
+""",
 }
 
 

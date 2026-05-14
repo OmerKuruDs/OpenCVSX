@@ -160,4 +160,57 @@ LAPLACIAN = OperationSpec(
 )
 
 
-ALL: tuple[OperationSpec, ...] = (CANNY, SOBEL, LAPLACIAN)
+def _scharr(image: np.ndarray, dx: int, dy: int) -> np.ndarray:
+    gray = _to_gray(image)
+    dx_i, dy_i = int(dx), int(dy)
+    if dx_i == 0 and dy_i == 0:
+        return gray
+    if dx_i == 1 and dy_i == 1:
+        # Scharr requires exactly one of dx/dy to be 1 — compose magnitude.
+        gx = cv2.Scharr(gray, cv2.CV_64F, 1, 0)
+        gy = cv2.Scharr(gray, cv2.CV_64F, 0, 1)
+        return cv2.convertScaleAbs(np.abs(gx) + np.abs(gy))
+    return cv2.convertScaleAbs(cv2.Scharr(gray, cv2.CV_64F, dx_i, dy_i))
+
+
+def _scharr_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    dx = int(params["dx"])
+    dy = int(params["dy"])
+    if dx == 0 and dy == 0:
+        return [_to_gray_line(a, output_var)]
+    if dx == 1 and dy == 1:
+        return [
+            _to_gray_line(a, "_gray"),
+            "_gx = cv2.Scharr(_gray, cv2.CV_64F, 1, 0)",
+            "_gy = cv2.Scharr(_gray, cv2.CV_64F, 0, 1)",
+            f"{output_var} = cv2.convertScaleAbs(np.abs(_gx) + np.abs(_gy))",
+        ]
+    return [
+        _to_gray_line(a, output_var),
+        f"{output_var} = cv2.convertScaleAbs(cv2.Scharr({output_var}, "
+        f"cv2.CV_64F, {dx}, {dy}))",
+    ]
+
+
+SCHARR = OperationSpec(
+    id="edge.scharr",
+    name="Scharr",
+    category="Edge",
+    description=(
+        "Optimised 3×3 derivative kernel — sharper than Sobel for small "
+        "kernels. Set both <i>dx</i> and <i>dy</i> to 1 for the magnitude of "
+        "the gradient (|Gx| + |Gy|)."
+    ),
+    parameters=(
+        Parameter(name="dx", kind="int", default=1, min=0, max=1, label="dx"),
+        Parameter(name="dy", kind="int", default=0, min=0, max=1, label="dy"),
+    ),
+    func=_scharr,
+    code_export=_scharr_code,
+)
+
+
+ALL: tuple[OperationSpec, ...] = (CANNY, SOBEL, LAPLACIAN, SCHARR)

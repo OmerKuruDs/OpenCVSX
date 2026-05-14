@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import numpy as np
 
-from cvsandbox.operations.morphology import CLOSE, DILATE, ERODE, OPEN
+from cvsandbox.operations.morphology import (
+    BLACKHAT,
+    CLOSE,
+    DILATE,
+    ERODE,
+    GRADIENT,
+    OPEN,
+    TOPHAT,
+)
 
 
 def _dot_image() -> np.ndarray:
@@ -40,3 +48,28 @@ def test_open_removes_isolated_bright_pixel() -> None:
 def test_close_fills_isolated_dark_hole() -> None:
     out = CLOSE.func(_ring_image(), shape="Rectangle", ksize=3, iterations=1)
     assert out[5, 5] == 255
+
+
+def test_gradient_outlines_bright_square() -> None:
+    img = np.zeros((11, 11), dtype=np.uint8)
+    img[3:8, 3:8] = 255
+    out = GRADIENT.func(img, shape="Rectangle", ksize=3, iterations=1)
+    # Outline pixels should be bright; the inside should be dark again.
+    assert out[5, 5] == 0  # interior cancels
+    assert out[3, 3] > 0  # rim survives
+
+
+def test_tophat_isolates_small_bright_feature() -> None:
+    img = np.zeros((21, 21), dtype=np.uint8)
+    img[10, 10] = 255
+    out = TOPHAT.func(img, shape="Rectangle", ksize=5, iterations=1)
+    # Top-Hat (input - opening) should preserve the isolated bright pixel.
+    assert out[10, 10] == 255
+
+
+def test_blackhat_isolates_small_dark_feature() -> None:
+    img = np.full((21, 21), 255, dtype=np.uint8)
+    img[10, 10] = 0
+    out = BLACKHAT.func(img, shape="Rectangle", ksize=5, iterations=1)
+    # Black-Hat (closing - input) should yield a bright spot at the hole.
+    assert out[10, 10] == 255

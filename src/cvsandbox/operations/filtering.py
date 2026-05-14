@@ -210,4 +210,151 @@ NL_MEANS = OperationSpec(
 )
 
 
-ALL: tuple[OperationSpec, ...] = (GAUSSIAN_BLUR, MEDIAN_BLUR, BILATERAL, NL_MEANS)
+def _unsharp_mask(
+    image: np.ndarray, radius: int, amount: float, threshold: int
+) -> np.ndarray:
+    k = max(1, int(radius) | 1)
+    blurred = cv2.GaussianBlur(image, (k, k), 0)
+    diff = image.astype(np.int16) - blurred.astype(np.int16)
+    if int(threshold) > 0:
+        diff = np.where(np.abs(diff) >= int(threshold), diff, 0)
+    out = image.astype(np.float32) + float(amount) * diff.astype(np.float32)
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def _unsharp_mask_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    k = max(1, int(params["radius"]) | 1)
+    amount = float(params["amount"])
+    thr = int(params["threshold"])
+    return [
+        f"_blurred = cv2.GaussianBlur({a}, ({k}, {k}), 0)",
+        f"_diff = {a}.astype(np.int16) - _blurred.astype(np.int16)",
+        f"_diff = np.where(np.abs(_diff) >= {thr}, _diff, 0)" if thr > 0 else "# (no threshold)",
+        f"_out = {a}.astype(np.float32) + {amount} * _diff.astype(np.float32)",
+        f"{output_var} = np.clip(_out, 0, 255).astype(np.uint8)",
+    ]
+
+
+UNSHARP_MASK = OperationSpec(
+    id="filtering.unsharp_mask",
+    name="Unsharp Mask",
+    category="Filtering",
+    description=(
+        "Classic photographic sharpening: subtract a blurred copy from the "
+        "original to isolate detail, then add it back multiplied by "
+        "<i>amount</i>. <i>Threshold</i> protects flat areas from being sharpened."
+    ),
+    parameters=(
+        Parameter(
+            name="radius",
+            kind="kernel_size",
+            default=3,
+            min=1,
+            max=31,
+            step=2,
+            label="Blur radius (px)",
+            description="Odd kernel size for the Gaussian copy.",
+        ),
+        Parameter(
+            name="amount",
+            kind="float",
+            default=1.0,
+            min=0.0,
+            max=5.0,
+            step=0.1,
+            label="Amount",
+            description="How strongly to boost detail. 0 = no change, 1-2 = typical.",
+        ),
+        Parameter(
+            name="threshold",
+            kind="int",
+            default=0,
+            min=0,
+            max=128,
+            label="Threshold",
+            description="Only sharpen pixels whose detail magnitude exceeds this. "
+            "0 = sharpen everything.",
+        ),
+    ),
+    func=_unsharp_mask,
+    code_export=_unsharp_mask_code,
+)
+
+
+_KERNEL_PRESETS: dict[str, tuple[tuple[float, ...], ...]] = {
+    "Identity": ((0, 0, 0), (0, 1, 0), (0, 0, 0)),
+    "Sharpen": ((0, -1, 0), (-1, 5, -1), (0, -1, 0)),
+    "Strong Sharpen": ((-1, -1, -1), (-1, 9, -1), (-1, -1, -1)),
+    "Edge Enhance": ((0, -1, 0), (-1, 4, -1), (0, -1, 0)),
+    "Emboss": ((-2, -1, 0), (-1, 1, 1), (0, 1, 2)),
+    "Outline": ((-1, -1, -1), (-1, 8, -1), (-1, -1, -1)),
+    "Box Blur 3x3": ((1 / 9, 1 / 9, 1 / 9), (1 / 9, 1 / 9, 1 / 9), (1 / 9, 1 / 9, 1 / 9)),
+}
+
+
+def _custom_kernel(image: np.ndarray, preset: str, strength: float) -> np.ndarray:
+    base = np.array(_KERNEL_PRESETS[preset], dtype=np.float32)
+    kernel = base * float(strength)
+    out = cv2.filter2D(image, ddepth=cv2.CV_32F, kernel=kernel)
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def _custom_kernel_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    preset = params["preset"]
+    base = _KERNEL_PRESETS[preset]
+    strength = float(params["strength"])
+    rows = ", ".join(
+        "(" + ", ".join(f"{v * strength:.6g}" for v in row) + ")" for row in base
+    )
+    return [
+        f"_kernel = np.array(({rows}), dtype=np.float32)",
+        f"_out = cv2.filter2D({a}, ddepth=cv2.CV_32F, kernel=_kernel)",
+        f"{output_var} = np.clip(_out, 0, 255).astype(np.uint8)",
+    ]
+
+
+CUSTOM_KERNEL = OperationSpec(
+    id="filtering.custom_kernel",
+    name="Custom Kernel",
+    category="Filtering",
+    description=(
+        "Applies a 3×3 convolution chosen from a preset list. <i>Strength</i> "
+        "scales the whole kernel so you can dial the effect in or out."
+    ),
+    parameters=(
+        Parameter(
+            name="preset",
+            kind="choice",
+            default="Sharpen",
+            choices=tuple(_KERNEL_PRESETS.keys()),
+            label="Kernel preset",
+        ),
+        Parameter(
+            name="strength",
+            kind="float",
+            default=1.0,
+            min=0.0,
+            max=3.0,
+            step=0.05,
+            label="Strength",
+        ),
+    ),
+    func=_custom_kernel,
+    code_export=_custom_kernel_code,
+)
+
+
+ALL: tuple[OperationSpec, ...] = (
+    GAUSSIAN_BLUR,
+    MEDIAN_BLUR,
+    BILATERAL,
+    NL_MEANS,
+    UNSHARP_MASK,
+    CUSTOM_KERNEL,
+)

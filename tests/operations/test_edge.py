@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from cvsandbox.operations.edge import CANNY, LAPLACIAN, SOBEL
+from cvsandbox.operations.edge import CANNY, LAPLACIAN, SCHARR, SOBEL
 
 
 def _vertical_step() -> np.ndarray:
@@ -46,3 +46,26 @@ def test_laplacian_returns_uint8_edge_map() -> None:
     out = LAPLACIAN.func(_vertical_step(), ksize=3)
     assert out.dtype == np.uint8
     assert out.max() > 0  # the edge should produce some response
+
+
+def test_scharr_dx_responds_to_vertical_edge() -> None:
+    out = SCHARR.func(_vertical_step(), dx=1, dy=0)
+    column_sums = out.sum(axis=0).astype(np.int64)
+    peak_col = int(np.argmax(column_sums))
+    assert peak_col in {14, 15, 16, 17}
+    assert out.dtype == np.uint8
+
+
+def test_scharr_zero_orders_pass_through_grayscale() -> None:
+    img = np.full((4, 4, 3), 100, dtype=np.uint8)
+    out = SCHARR.func(img, dx=0, dy=0)
+    assert out.ndim == 2
+    assert np.all(out == out[0, 0])
+
+
+def test_scharr_magnitude_mode_combines_directions() -> None:
+    img = _vertical_step()
+    only_x = SCHARR.func(img, dx=1, dy=0)
+    magnitude = SCHARR.func(img, dx=1, dy=1)
+    # The dx=dy=1 magnitude composite must be at least as strong as dx alone.
+    assert int(magnitude.max()) >= int(only_x.max())

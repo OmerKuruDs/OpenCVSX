@@ -177,4 +177,95 @@ CLOSE = OperationSpec(
 )
 
 
-ALL: tuple[OperationSpec, ...] = (ERODE, DILATE, OPEN, CLOSE)
+def _gradient(image: np.ndarray, shape: str, ksize: int, iterations: int) -> np.ndarray:
+    return cv2.morphologyEx(
+        image, cv2.MORPH_GRADIENT, _kernel(shape, ksize), iterations=int(iterations)
+    )
+
+
+def _tophat(image: np.ndarray, shape: str, ksize: int, iterations: int) -> np.ndarray:
+    return cv2.morphologyEx(
+        image, cv2.MORPH_TOPHAT, _kernel(shape, ksize), iterations=int(iterations)
+    )
+
+
+def _blackhat(image: np.ndarray, shape: str, ksize: int, iterations: int) -> np.ndarray:
+    return cv2.morphologyEx(
+        image, cv2.MORPH_BLACKHAT, _kernel(shape, ksize), iterations=int(iterations)
+    )
+
+
+def _gradient_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    return _morph_ex_code("cv2.MORPH_GRADIENT", params, a, output_var)
+
+
+def _tophat_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    return _morph_ex_code("cv2.MORPH_TOPHAT", params, a, output_var)
+
+
+def _blackhat_code(
+    params: dict[str, Any], input_vars: tuple[str, ...], output_var: str
+) -> list[str]:
+    (a,) = input_vars
+    return _morph_ex_code("cv2.MORPH_BLACKHAT", params, a, output_var)
+
+
+GRADIENT = OperationSpec(
+    id="morphology.gradient",
+    name="Gradient",
+    category="Morphology",
+    description=(
+        "Dilation minus erosion — produces an outline of bright regions. "
+        "Cheap edge detector for binary or near-binary inputs."
+    ),
+    parameters=_shared_params(),
+    func=_gradient,
+    code_export=_gradient_code,
+)
+
+
+TOPHAT = OperationSpec(
+    id="morphology.tophat",
+    name="Top-Hat",
+    category="Morphology",
+    description=(
+        "Input minus its opening — isolates bright features smaller than the "
+        "kernel. Great for picking out small bright objects on a darker "
+        "uneven background."
+    ),
+    parameters=_shared_params(),
+    func=_tophat,
+    code_export=_tophat_code,
+)
+
+
+BLACKHAT = OperationSpec(
+    id="morphology.blackhat",
+    name="Black-Hat",
+    category="Morphology",
+    description=(
+        "Closing minus input — isolates dark features smaller than the "
+        "kernel. The mirror of Top-Hat for dark blobs on a brighter "
+        "background."
+    ),
+    parameters=_shared_params(),
+    func=_blackhat,
+    code_export=_blackhat_code,
+)
+
+
+ALL: tuple[OperationSpec, ...] = (
+    ERODE,
+    DILATE,
+    OPEN,
+    CLOSE,
+    GRADIENT,
+    TOPHAT,
+    BLACKHAT,
+)

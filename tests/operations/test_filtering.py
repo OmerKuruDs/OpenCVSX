@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from cvsandbox.operations.filtering import BILATERAL, GAUSSIAN_BLUR, MEDIAN_BLUR, NL_MEANS
+from cvsandbox.operations.filtering import (
+    BILATERAL,
+    CUSTOM_KERNEL,
+    GAUSSIAN_BLUR,
+    MEDIAN_BLUR,
+    NL_MEANS,
+    UNSHARP_MASK,
+)
 
 
 def test_gaussian_blur_preserves_shape_and_dtype() -> None:
@@ -67,3 +74,42 @@ def test_nl_means_gray_branch_preserves_shape() -> None:
     out = NL_MEANS.func(img, strength=5.0, template_size=3, search_size=7)
     assert out.shape == img.shape
     assert out.dtype == np.uint8
+
+
+def test_unsharp_mask_increases_contrast_at_an_edge() -> None:
+    img = np.zeros((20, 20), dtype=np.uint8)
+    img[:, 10:] = 128  # soft edge
+    out = UNSHARP_MASK.func(img, radius=3, amount=2.0, threshold=0)
+    # The pixel one step inside the bright side should now exceed 128.
+    assert int(out[10, 10]) >= int(img[10, 10])
+    # The pixel one step inside the dark side should be pushed below 0 → clipped to 0.
+    assert int(out[10, 9]) <= int(img[10, 9])
+
+
+def test_unsharp_mask_threshold_skips_flat_regions() -> None:
+    flat = np.full((10, 10), 100, dtype=np.uint8)
+    out = UNSHARP_MASK.func(flat, radius=3, amount=2.0, threshold=10)
+    # Detail magnitude on a flat image is 0; threshold gates everything out.
+    assert np.array_equal(out, flat)
+
+
+def test_custom_kernel_identity_returns_input() -> None:
+    img = np.random.default_rng(0).integers(0, 255, size=(16, 16, 3), dtype=np.uint8)
+    out = CUSTOM_KERNEL.func(img, preset="Identity", strength=1.0)
+    assert np.array_equal(out, img)
+
+
+def test_custom_kernel_box_blur_smooths() -> None:
+    img = np.zeros((9, 9), dtype=np.uint8)
+    img[4, 4] = 255
+    out = CUSTOM_KERNEL.func(img, preset="Box Blur 3x3", strength=1.0)
+    # The bright pixel should diffuse into its 3×3 neighbourhood.
+    assert out[4, 4] < 255
+    assert out[3, 4] > 0
+
+
+def test_custom_kernel_strength_zero_blanks_image() -> None:
+    img = np.full((8, 8), 200, dtype=np.uint8)
+    out = CUSTOM_KERNEL.func(img, preset="Sharpen", strength=0.0)
+    # Zero kernel produces an all-zero image.
+    assert int(out.max()) == 0

@@ -14,12 +14,17 @@ from cvsandbox.core.operation import OperationSpec
 from cvsandbox.core.registry import register_operation
 from cvsandbox.operations import (
     analysis,
+    arithmetic,
     color,
     composite,
     edge,
+    features,
     filtering,
+    freq,
     geometric,
     morphology,
+    segmentation,
+    stereo,
     threshold,
 )
 
@@ -32,6 +37,11 @@ _BUILTIN_MODULES = (
     geometric,
     analysis,
     composite,
+    features,
+    freq,
+    segmentation,
+    arithmetic,
+    stereo,
 )
 
 

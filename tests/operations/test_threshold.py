@@ -5,7 +5,9 @@ import numpy as np
 from cvsandbox.operations.threshold import (
     ADAPTIVE_THRESHOLD,
     BINARY_THRESHOLD,
+    IN_RANGE_BGR,
     OTSU_THRESHOLD,
+    TRIANGLE_THRESHOLD,
 )
 
 
@@ -53,3 +55,54 @@ def test_adaptive_threshold_handles_uneven_lighting() -> None:
     )
     assert out.shape == _gradient_gray().shape
     assert out.dtype == np.uint8
+
+
+def test_triangle_threshold_returns_binary_mask() -> None:
+    out = TRIANGLE_THRESHOLD.func(_gradient_gray(), maxval=255, inverse=False)
+    assert set(np.unique(out).tolist()) <= {0, 255}
+    assert out.shape == _gradient_gray().shape
+
+
+def test_triangle_threshold_inverse_swaps_polarity() -> None:
+    plain = TRIANGLE_THRESHOLD.func(_gradient_gray(), maxval=255, inverse=False)
+    flipped = TRIANGLE_THRESHOLD.func(_gradient_gray(), maxval=255, inverse=True)
+    # Inverse should be the bitwise complement.
+    assert np.array_equal(flipped, 255 - plain)
+
+
+def test_in_range_bgr_isolates_target_color() -> None:
+    img = np.zeros((10, 10, 3), dtype=np.uint8)
+    img[2:8, 2:8] = (50, 100, 200)  # rectangle of one BGR value
+    out = IN_RANGE_BGR.func(
+        img,
+        b_low=40, b_high=60,
+        g_low=90, g_high=110,
+        r_low=190, r_high=210,
+    )
+    assert out.ndim == 2
+    assert int(out[5, 5]) == 255  # inside the rect
+    assert int(out[0, 0]) == 0  # outside (pure black background)
+
+
+def test_in_range_bgr_swaps_low_and_high_safely() -> None:
+    img = np.full((5, 5, 3), 128, dtype=np.uint8)
+    # User puts low > high — op should normalise rather than crash.
+    out = IN_RANGE_BGR.func(
+        img,
+        b_low=200, b_high=50,
+        g_low=200, g_high=50,
+        r_low=200, r_high=50,
+    )
+    assert int(out[2, 2]) == 255
+
+
+def test_in_range_bgr_accepts_grayscale_input() -> None:
+    img = np.full((4, 4), 128, dtype=np.uint8)
+    out = IN_RANGE_BGR.func(
+        img,
+        b_low=100, b_high=150,
+        g_low=100, g_high=150,
+        r_low=100, r_high=150,
+    )
+    assert out.shape == (4, 4)
+    assert int(out[0, 0]) == 255
