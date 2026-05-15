@@ -82,7 +82,7 @@ Left-rail mode switcher: **Op** / **2D** / **3D** / **AI**. Op shows the full op
 ## Quick start
 
 ```bash
-git clone https://github.com/OmerKuru/CVStudio.git
+git clone https://github.com/OmerKuruDs/CVStudio.git
 cd CVStudio
 python -m venv .venv
 .venv\Scripts\activate              # Windows PowerShell

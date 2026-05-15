@@ -49,8 +49,8 @@ ai = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/OmerKuru/CVStudio"
-Issues = "https://github.com/OmerKuru/CVStudio/issues"
+Homepage = "https://github.com/OmerKuruDs/CVStudio"
+Issues = "https://github.com/OmerKuruDs/CVStudio/issues"
 
 [project.scripts]
 cvstudio = "cvstudio.__main__:main"
