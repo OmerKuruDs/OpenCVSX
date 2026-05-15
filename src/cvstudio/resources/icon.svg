@@ -1,26 +1,187 @@
-<svg width="100%" viewBox="0 0 410 410" role="img" xmlns="http://www.w3.org/2000/svg" style="">
-<title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Computer vision icon — monochrome cyan variant</title>
-<desc style="fill:rgb(0, 0, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Same eye-lens silhouette but using a single cyan accent ramp instead of RGB</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Arka plan gradyanı -->
+    <radialGradient id="bgGrad" cx="50%" cy="45%" r="75%">
+      <stop offset="0%" stop-color="#10204D"/>
+      <stop offset="55%" stop-color="#0A1640"/>
+      <stop offset="100%" stop-color="#050B26"/>
+    </radialGradient>
 
-<defs>
-<clipPath id="eyeShape2">
-<path d="M 50 200 Q 200 50, 350 200 Q 200 350, 50 200 Z"/>
-</clipPath>
-</defs>
+    <!-- İris dış halkası gradyanı (kenarlarda koyu, merkeze yakın açık) -->
+    <radialGradient id="irisRing" cx="50%" cy="50%" r="55%">
+      <stop offset="0%"   stop-color="#9FE6F0"/>
+      <stop offset="50%"  stop-color="#4FB4C7"/>
+      <stop offset="100%" stop-color="#1B4F62"/>
+    </radialGradient>
 
-<rect width="400" height="400" rx="88" fill="#0b1437" style="fill:rgb(11, 20, 55);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+    <!-- İris merkez (açık) gradyan -->
+    <radialGradient id="irisCenter" cx="45%" cy="42%" r="60%">
+      <stop offset="0%"   stop-color="#EAFBFD"/>
+      <stop offset="60%"  stop-color="#C8F1F6"/>
+      <stop offset="100%" stop-color="#7AD8E5"/>
+    </radialGradient>
 
-<path d="M 50 200 Q 200 50, 350 200 Q 200 350, 50 200 Z" fill="#1a2654" style="fill:rgb(26, 38, 84);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+    <!-- Pupil gradyanı -->
+    <radialGradient id="pupilGrad" cx="45%" cy="45%" r="60%">
+      <stop offset="0%"   stop-color="#0A1438"/>
+      <stop offset="100%" stop-color="#03061A"/>
+    </radialGradient>
 
-<g clip-path="url(#eyeShape2)" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-<circle cx="200" cy="200" r="112" fill="#0e7490" style="fill:rgb(14, 116, 144);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="200" cy="200" r="90" fill="#0891b2" style="fill:rgb(8, 145, 178);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="200" cy="200" r="68" fill="#22d3ee" style="fill:rgb(34, 211, 238);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="200" cy="200" r="42" fill="#cffafe" style="fill:rgb(207, 250, 254);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="200" cy="200" r="22" fill="#0b1437" style="fill:rgb(11, 20, 55);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-</g>
+    <!-- Glow filtreleri -->
+    <filter id="cyanGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="hardGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
 
-<circle cx="184" cy="184" r="9" fill="#f1f5f9" style="fill:rgb(241, 245, 249);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+    <!-- Köşe yuvarlama -->
+    <clipPath id="roundedClip">
+      <rect x="0" y="0" width="1024" height="1024" rx="170" ry="170"/>
+    </clipPath>
 
-<path d="M 50 200 Q 200 50, 350 200 Q 200 350, 50 200 Z" fill="none" stroke="#0b1437" stroke-width="6" style="fill:none;stroke:rgb(11, 20, 55);color:rgb(0, 0, 0);stroke-width:6px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+    <!-- Göz şekli (iris clip için) -->
+    <clipPath id="eyeShape">
+      <path d="M 140 500 C 320 230, 704 230, 884 500 C 704 770, 320 770, 140 500 Z"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#roundedClip)">
+    <!-- Arka plan -->
+    <rect width="1024" height="1024" fill="url(#bgGrad)"/>
+
+    <!-- ============ ORGANİK DALGA HALKALARI ============ -->
+    <!-- Düzensiz, el-çizimi gibi konsantrik dalgalar; bezier control'ları offset'li -->
+    <g fill="none" stroke="#6FE0EC" stroke-opacity="0.22" stroke-width="2.2" filter="url(#softGlow)">
+      <!-- Halka 1 (en iç) -->
+      <path d="M 250 500
+               C 270 380, 400 320, 512 318
+               C 624 320, 754 380, 774 500
+               C 754 620, 624 680, 512 682
+               C 400 680, 270 620, 250 500 Z"/>
+      <!-- Halka 2 -->
+      <path d="M 205 498
+               C 230 360, 380 290, 512 285
+               C 648 292, 795 365, 818 502
+               C 800 638, 650 712, 512 715
+               C 372 710, 228 635, 205 498 Z"/>
+      <!-- Halka 3 -->
+      <path d="M 162 502
+               C 195 340, 360 258, 510 252
+               C 668 260, 830 345, 860 504
+               C 838 660, 670 745, 512 748
+               C 350 742, 188 658, 162 502 Z"/>
+      <!-- Halka 4 -->
+      <path d="M 118 500
+               C 158 320, 340 222, 510 218
+               C 690 226, 870 325, 905 503
+               C 878 678, 692 778, 512 782
+               C 328 776, 152 678, 118 500 Z"/>
+      <!-- Halka 5 -->
+      <path d="M 78 502
+               C 122 305, 318 192, 508 186
+               C 712 196, 908 305, 948 504
+               C 916 700, 712 808, 510 812
+               C 305 805, 116 698, 78 502 Z"/>
+      <!-- Halka 6 (en dış) -->
+      <path d="M 42 498
+               C 90 285, 300 162, 508 154
+               C 730 166, 944 282, 988 504
+               C 952 720, 732 838, 510 842
+               C 285 832, 80 720, 42 498 Z"/>
+    </g>
+
+    <!-- Üst ve alt yatay dalgalar -->
+    <g fill="none" stroke="#7AE8F2" stroke-opacity="0.14" stroke-width="1.5">
+      <path d="M 30 460 C 200 380, 380 350, 512 348 C 644 350, 824 380, 994 460"/>
+      <path d="M 30 540 C 200 620, 380 650, 512 652 C 644 650, 824 620, 994 540"/>
+      <path d="M 60 425 C 220 335, 380 305, 512 302 C 644 305, 804 335, 964 425"/>
+      <path d="M 60 575 C 220 665, 380 695, 512 698 C 644 695, 804 665, 964 575"/>
+    </g>
+
+    <!-- ============ GÖZ ============ -->
+
+    <!-- 1. Önce göz şekli içini iris için doldur, ama clip ile göz dışına taşmasın -->
+    <g clip-path="url(#eyeShape)">
+      <!-- Köşelerdeki lacivert üçgen alanlar (göz - iris arası) için TÜM göz şeklini lacivertle doldur -->
+      <rect x="0" y="0" width="1024" height="1024" fill="#0A1640"/>
+
+      <!-- İris dış halka -->
+      <circle cx="512" cy="500" r="240" fill="url(#irisRing)"/>
+
+      <!-- İris üzerinde ince konsantrik doku halkaları -->
+      <g fill="none" stroke="#BFF2F8" stroke-opacity="0.45" stroke-width="1.3">
+        <circle cx="512" cy="500" r="225"/>
+        <circle cx="512" cy="500" r="210"/>
+        <circle cx="512" cy="500" r="195"/>
+        <circle cx="512" cy="500" r="178"/>
+        <circle cx="512" cy="500" r="160"/>
+        <circle cx="512" cy="500" r="142"/>
+      </g>
+
+      <!-- İris parlak iç bölge -->
+      <circle cx="512" cy="500" r="125" fill="url(#irisCenter)"/>
+
+      <!-- Pupil (gözbebeği) -->
+      <circle cx="512" cy="500" r="58" fill="url(#pupilGrad)"/>
+
+      <!-- Pupil highlight -->
+      <circle cx="494" cy="484" r="14" fill="#FFFFFF" opacity="0.95"/>
+      <circle cx="504" cy="496" r="4"  fill="#FFFFFF" opacity="0.7"/>
+    </g>
+
+    <!-- 2. Göz dış kontur çizgisi (cyan, glow) -->
+    <g filter="url(#cyanGlow)">
+      <path d="M 140 500 C 320 230, 704 230, 884 500 C 704 770, 320 770, 140 500 Z"
+            fill="none" stroke="#A8F0F8" stroke-width="8" stroke-linejoin="round"/>
+    </g>
+
+    <!-- ============ DEVRE / NODE NOKTALARI (irisin etrafında oktagon) ============ -->
+    <!-- 8 nokta, merkez (512,500), yarıçap 195, başlangıç açısı -67.5° (saat 11) -->
+    <!-- Bağlantı çizgileri (oktagon kenarları) -->
+    <g stroke="#A8F0F8" stroke-width="2" fill="none" opacity="0.9" filter="url(#softGlow)">
+      <path d="
+        M 437.4 319.7
+        L 587.4 319.7
+        L 695.3 408.5
+        L 707 500
+        L 695.3 591.5
+        L 587.4 680.3
+        L 437.4 680.3
+        L 329.5 591.5
+        L 317 500
+        L 329.5 408.5
+        Z"/>
+    </g>
+
+    <!-- Devre düğüm noktaları (irisin etrafında 8 nokta) -->
+    <g fill="#0A1640" stroke="#B8F4FA" stroke-width="2.5" filter="url(#softGlow)">
+      <!-- 8 nokta: açılar -67.5, -22.5, 22.5, 67.5, 112.5, 157.5, 202.5, 247.5 (deg) -->
+      <circle cx="437.4" cy="319.7" r="9"/>   <!-- üst-sol -->
+      <circle cx="587.4" cy="319.7" r="9"/>   <!-- üst-sağ -->
+      <circle cx="695.3" cy="408.5" r="9"/>   <!-- sağ-üst -->
+      <circle cx="695.3" cy="591.5" r="9"/>   <!-- sağ-alt -->
+      <circle cx="587.4" cy="680.3" r="9"/>   <!-- alt-sağ -->
+      <circle cx="437.4" cy="680.3" r="9"/>   <!-- alt-sol -->
+      <circle cx="329.5" cy="591.5" r="9"/>   <!-- sol-alt -->
+      <circle cx="329.5" cy="408.5" r="9"/>   <!-- sol-üst -->
+    </g>
+
+    <!-- ============ METİN ============ -->
+    <g filter="url(#hardGlow)">
+      <text x="512" y="935"
+            font-family="'Segoe UI', 'Helvetica Neue', 'Arial', sans-serif"
+            font-size="135"
+            font-weight="300"
+            fill="#C5F1F6"
+            text-anchor="middle"
+            letter-spacing="3">CVStudio</text>
+    </g>
+  </g>
 </svg>
