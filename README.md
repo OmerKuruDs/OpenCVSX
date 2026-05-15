@@ -22,6 +22,27 @@ CVStudio is a desktop tool for **finding the right OpenCV pipeline by iterating 
 
 Built for engineers who currently iterate on `cv2.GaussianBlur(img, (5, 5), 0)` calls in Jupyter cells, one parameter at a time — and who'd like an LLM-grade second opinion on the result without leaving the editor.
 
+## Screenshots
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/op-mode.png" alt="Op mode — pipeline editor" />
+<br/><sub><b>Op mode</b> — operation catalog on the left, live preview in the centre, parameter panel on the right, node-graph view at the bottom. Pipeline: <i>Source → Adaptive Threshold → Median Blur</i>.</sub>
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/before-after.png" alt="Before/after split view" />
+<br/><sub><b>Before / After split</b> (<code>Ctrl+B</code>) — original on the left, processed on the right, sharing one zoom and pan so you can compare pixel-by-pixel.</sub>
+</td>
+</tr>
+<tr>
+<td align="center" colspan="2">
+<img src="docs/screenshots/viz-3d.png" alt="3D surface visualization" width="80%" />
+<br/><sub><b>3D visualization mode</b> — the same pipeline output rendered as an interactive surface plot (pyqtgraph, Turbo colormap, draggable view). The activity bar on the left switches between Op / 2D / 3D / AI without rebuilding the pipeline.</sub>
+</td>
+</tr>
+</table>
+
 ## Highlights
 
 ### Pipeline editor
